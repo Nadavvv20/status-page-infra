@@ -32,6 +32,7 @@ module "eks" {
         NodeGroup = "app-nodes"
         "k8s.io/cluster-autoscaler/enabled"              = "true"
         "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+        Name = "${var.project_name}-Worker-Node"
       }
     }
   }
@@ -41,22 +42,5 @@ module "eks" {
   tags = {
     Environment = var.environment
     Project     = var.project_name
-  }
-}
-
-# IAM Role for the Autoscaler (Using IRSA)
-module "cluster_autoscaler_irsa_role" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
-
-  role_name                        = "cluster-autoscaler-role-nadav"
-  attach_cluster_autoscaler_policy = true
-  cluster_autoscaler_cluster_ids   = [module.eks.cluster_name]
-
-  oidc_providers = {
-    ex = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:cluster-autoscaler"]
-    }
   }
 }

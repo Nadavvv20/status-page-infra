@@ -1,6 +1,6 @@
 # 1. Create the Static Files bucket
 resource "aws_s3_bucket" "app_assets" {
-  bucket        = "${var.project_name}-assets-${var.environment}"
+  bucket        = lower("${var.project_name}-assets-${var.environment}")
   force_destroy = true
 }
 

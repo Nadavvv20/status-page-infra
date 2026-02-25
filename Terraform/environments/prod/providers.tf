@@ -12,9 +12,9 @@ terraform {
     }
     # Save the state in S3 for data durability
     backend "s3" {
-    bucket         = "nadav-tf-bucket " 
+    bucket         = "nadav-tfstate-bucket" 
     key            = "prod/terraform.tfstate" 
-    region         = "us-west-1"                          
+    region         = "us-east-1"                          
     encrypt        = true                                 
   }
 }

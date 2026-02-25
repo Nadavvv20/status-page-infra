@@ -1,0 +1,38 @@
+# Terraform
+.terraform/
+
+*.tfstate
+*.tfstate.backup
+
+*.tfvars
+*.tfvars.json
+
+crash.log
+*.gui.log
+
+kubectl
+
+# Python & Django
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+env/
+.env
+
+*.sqlite3
+
+static/
+media/
+
+# Security 
+.aws/
+credentials
+*.pem
+
+# OS junk
+.DS_Store
+Thumbs.db
+.vscode/
+.history/

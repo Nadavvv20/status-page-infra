@@ -3,10 +3,10 @@ module "db" {
   source  = "terraform-aws-modules/rds/aws"
   version = "~> 6.0"
 
-  identifier = "${var.project_name}-db"
+  identifier = lower("${var.project_name}-db")
 
   engine               = "postgres"
-  engine_version       = "15.7" # Requirement: 10 or above
+  engine_version       = "15" # Requirement: 10 or above
   family               = "postgres15"
   major_engine_version = "15"
   instance_class       = var.db_instance_class
