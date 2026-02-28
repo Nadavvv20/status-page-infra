@@ -19,6 +19,7 @@ module "vpc" {
   # Database Subnets Setup
   create_database_subnet_group           = true
   create_database_internet_gateway_route = false
+  create_database_subnet_route_table = true
 
   # DNS Support
   enable_dns_hostnames = true
