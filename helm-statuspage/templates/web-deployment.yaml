@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "statuspage.fullname" . }}-web
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "statuspage.fullname" . }}-web
+  template:
+    metadata:
+      labels:
+        app: {{ include "statuspage.fullname" . }}-web
+    spec:
+      # Attach the SA to the pod so it recieves the IRSA Role (For S3) 
+      serviceAccountName: {{ include "statuspage.fullname" . }}-sa
+      initContainers:
+        - name: init-db
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          envFrom:
+            - configMapRef:
+                name: {{ include "statuspage.fullname" . }}-config
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: DB_PASSWORD
+            # Admin creation
+            - name: DJANGO_SUPERUSER_USERNAME
+              value: {{ .Values.config.adminUsername | quote }}
+            - name: DJANGO_SUPERUSER_EMAIL
+              value: {{ .Values.config.adminEmail | quote }}
+            - name: DJANGO_SUPERUSER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: ADMIN_PASSWORD
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python manage.py migrate --noinput &&
+              python manage.py createsuperuser --noinput || true
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args: ["gunicorn", "--bind", "0.0.0.0:8000", "statuspage.wsgi:application"]
+          ports:
+            - containerPort: 8000
+          
+          # Pull variables from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: {{ include "statuspage.fullname" . }}-config
+          
+          # Pull DB Password
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: DB_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: SECRET_KEY
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10

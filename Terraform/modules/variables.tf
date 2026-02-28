@@ -63,3 +63,9 @@ variable "db_deletion_protection" {
   description = "If true, the database cannot be deleted"
   type        = bool
 }
+
+
+variable "enable_s3_assets" {
+  description = "Toggles the creation of S3 bucket and IRSA resources"
+  type        = bool
+}

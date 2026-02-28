@@ -12,6 +12,7 @@ module "db" {
   instance_class       = var.db_instance_class
 
   allocated_storage = 20
+  manage_master_user_password = false
 
   db_name  = "statuspage"
   username = "statuspage"

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "statuspage.fullname" . }}-scheduler
+spec:
+  replicas: 1 # Must be only one so each task is done only once
+  selector:
+    matchLabels:
+      app: {{ include "statuspage.fullname" . }}-scheduler
+  template:
+    metadata:
+      labels:
+        app: {{ include "statuspage.fullname" . }}-scheduler
+    spec:
+      serviceAccountName: {{ include "statuspage.fullname" . }}-sa
+      containers:
+        - name: scheduler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["python"]
+          args:
+            - "manage.py"
+            - "rqscheduler"
+            - "--interval"
+            - "60"
+          
+          envFrom:
+            - configMapRef:
+                name: {{ include "statuspage.fullname" . }}-config
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: DB_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: SECRET_KEY
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

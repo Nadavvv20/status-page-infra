@@ -1,23 +1,7 @@
 # ==================================================================
-# IRSA Role to access the S3 static files bucket:
-module "s3_access_irsa_role" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
-
-  role_name = "${var.project_name}-s3-access-role"
-
-  role_policy_arns = {
-    policy = aws_iam_policy.s3_access_policy.arn
-  }
-
-  oidc_providers = {
-    ex = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["statuspage:statuspage-sa"] # Name of ServiceAccount in K8s
-    }
-  }
-}
+# S3 access policy:
 resource "aws_iam_policy" "s3_access_policy" {
+  count  = var.enable_s3_assets ? 1 : 0
   name        = "${var.project_name}-s3-access"
   description = "Allow Django pods to access S3 assets"
 
@@ -28,12 +12,31 @@ resource "aws_iam_policy" "s3_access_policy" {
         Action   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject"]
         Effect   = "Allow"
         Resource = [
-          aws_s3_bucket.app_assets.arn,
-          "${aws_s3_bucket.app_assets.arn}/*"
+          aws_s3_bucket.app_assets[0].arn,
+          "${aws_s3_bucket.app_assets[0].arn}/*"
         ]
       }
     ]
   })
+}
+module "statuspage_app_irsa" {
+  count  = var.enable_s3_assets ? 1 : 0
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name = "${var.project_name}-app-s3-role"
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["statuspage:statuspage-sa"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "app_s3_attach" {
+  count  = var.enable_s3_assets ? 1 : 0
+  role       = module.statuspage_app_irsa[0].iam_role_name
+  policy_arn = aws_iam_policy.s3_access_policy[0].arn
 }
 
 # ===============================================================
@@ -72,25 +75,7 @@ module "cluster_autoscaler_irsa_role" {
 }
 
 #========================================================
-# Role for app pods to access secret (for db password):
-module "secrets_manager_irsa_role" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.0"
-
-  role_name = "${var.project_name}-secrets-role"
-
-  role_policy_arns = {
-    secrets = aws_iam_policy.secrets_read_policy.arn
-  }
-
-  oidc_providers = {
-    ex = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["statuspage:statuspage-sa", "external-secrets:external-secrets"]
-    }
-  }
-}
-
+# Policy for ESO to access secrets
 resource "aws_iam_policy" "secrets_read_policy" {
   name        = "${var.project_name}-secrets-read"
   description = "Allow reading secrets from Secrets Manager"
@@ -104,8 +89,33 @@ resource "aws_iam_policy" "secrets_read_policy" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [aws_secretsmanager_secret.db_password.arn]
+        Resource = [  
+          aws_secretsmanager_secret.db_password.arn,
+          aws_secretsmanager_secret.django_secret.arn,
+          aws_secretsmanager_secret.django_admin_secret.arn
+        ]
       }
     ]
   })
+}
+module "external_secrets_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name = "${var.project_name}-external-secrets-role"
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["external-secrets:external-secrets"]
+    }
+  }
+
+  role_policy_arns = {
+    secrets_read = aws_iam_policy.secrets_read_policy.arn
+  }
+}
+resource "aws_iam_role_policy_attachment" "secrets_attach" {
+  role       = module.external_secrets_irsa_role.iam_role_name
+  policy_arn = aws_iam_policy.secrets_read_policy.arn
 }

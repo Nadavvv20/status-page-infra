@@ -23,3 +23,15 @@ output "load_balancer_controller_role_arn" {
 output "alb_security_group_id" {
   value = module.root_infrastructure.alb_sg_id
 }
+
+output "external_secrets_role_arn" {
+  value = module.root_infrastructure.external_secrets_irsa_role_arn
+}
+
+output "statuspage_app_irsa_arn" {
+  value = module.root_infrastructure.statuspage_app_irsa_arn
+}
+
+output "cluster_autoscaler_irsa_role_arn" {
+  value = module.root_infrastructure.cluster_autoscaler_irsa_role_arn
+}

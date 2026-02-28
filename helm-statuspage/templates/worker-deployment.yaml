@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "statuspage.fullname" . }}-worker
+spec:
+  replicas: {{ .Values.worker.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "statuspage.fullname" . }}-worker
+  template:
+    metadata:
+      labels:
+        app: {{ include "statuspage.fullname" . }}-worker
+    spec:
+      serviceAccountName: {{ include "statuspage.fullname" . }}-sa
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["python"]
+          args:
+            - "manage.py"
+            - "rqworker"
+            - "default"
+          envFrom:
+            - configMapRef:
+                name: {{ include "statuspage.fullname" . }}-config
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: DB_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "statuspage.fullname" . }}-secrets
+                  key: SECRET_KEY
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

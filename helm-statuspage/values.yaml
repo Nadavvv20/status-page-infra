@@ -1,0 +1,85 @@
+
+replicaCount: 2
+worker:
+  replicaCount: 1
+image:
+  repository: 992382545251.dkr.ecr.us-east-1.amazonaws.com/nadav-statuspage
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+
+# App settings -  for ConfigMap
+config:
+  djangoDebug: "False"
+  allowedHosts: "*"
+  useS3: "False"
+ # s3BucketName: "nadav-statuspage-project-dev-assets-dev"
+  awsRegion: "us-east-1"
+  adminUsername: "admin"
+  adminEmail: "admin@example.com"
+
+
+# DB information
+database:
+  engine: "django.db.backends.postgresql"
+  name: "statuspage"
+  user: "statuspage"
+  host: "nadav-statuspage-project-dev-db.cx248m4we6k7.us-east-1.rds.amazonaws.com"
+  port: 5432
+
+# Redis information
+redis:
+  host: "nadav-statuspage-project-dev-redis.7fftml.ng.0001.use1.cache.amazonaws.com"
+  port: 6379
+  tasksDb: 0
+  cachingDb: 1
+
+# IAM S3 Role (Static files bucket)
+serviceAccount:
+  create: true
+  #  annotations: 
+  #  roleArn: "arn:aws:iam::992382545251:role/Nadav-Statuspage-Project-DEV-app-s3-role"
+
+
+
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 85
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Names of the secrets inside of AWS Secrets Manager
+secrets:
+  djangoSecretName: "Nadav-Statuspage-Project-DEV-django-secret-dev"
+  dbPasswordSecretName: "Nadav-Statuspage-Project-DEV-db-password-dev"
+  djangoAdminSecretName: "Nadav-Statuspage-Project-DEV-admin-credentials-dev"
+
+httpRoute:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-port: "8000"
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
