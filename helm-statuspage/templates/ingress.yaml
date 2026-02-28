@@ -20,5 +20,5 @@ spec:
             backend:
               service:
                 name: {{ include "statuspage.fullname" . }}-web
-                port:
+                port: 
                   number: 80

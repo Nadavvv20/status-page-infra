@@ -13,6 +13,7 @@ variable "project_name" {
 variable "environment" {
   description = "Environment name (dev/prod)"
   type        = string
+  default     = "Dev"
 }
 
 variable "vpc_cidr" {
@@ -46,11 +47,15 @@ variable "db_instance_class" {
 }
 
 variable "redis_node_type" {
-  default = "cache.t3.micro"
+  description = "The instance type for the Redis cluster"
+  type        = string
+  default     = "cache.t3.micro"
 }
 
 variable "redis_engine_version" {
-  default = "7.0" # Requirement: 4 or above
+  description = "Redis engine version"
+  type        = string
+  default     = "7.0" # Requirement: 4 or above
 }
 
 variable "s3_bucket_name" {
