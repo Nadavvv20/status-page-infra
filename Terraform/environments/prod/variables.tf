@@ -13,6 +13,7 @@ variable "project_name" {
 variable "environment" {
   description = "Environment name (dev/prod)"
   type        = string
+  default     = "Prod"
 }
 
 variable "vpc_cidr" {
@@ -40,16 +41,21 @@ variable "capacity_type" {
 }
 
 variable "db_instance_class" {
+  description = "RDS instance type"
   type        = string
-  description = "The instance type for the RDS database"
+  default     = "db.t3.small"
 }
 
 variable "redis_node_type" {
-description = "The instance type for the Redis cluster"
+  description = "The instance type for the Redis cluster"
+  type        = string
+  default     = "cache.t3.small"
 }
 
 variable "redis_engine_version" {
-  default = "7.0" # Requirement: 4 or above
+  description = "Redis engine version"
+  type        = string
+  default     = "7.0" # Requirement: 4 or above
 }
 
 variable "s3_bucket_name" {
@@ -61,4 +67,10 @@ variable "s3_bucket_name" {
 variable "db_deletion_protection" {
   description = "If true, the database cannot be deleted"
   type        = bool
+}
+
+variable "enable_s3_assets" {
+  description = "Toggles the creation of S3 bucket and IRSA resources"
+  type        = bool
+  default     = false
 }
