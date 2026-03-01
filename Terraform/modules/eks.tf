@@ -3,7 +3,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.30"
+  cluster_version = "1.31"
 
   # Allows access from the internet to run 'kubectl' commands
   cluster_endpoint_public_access = true

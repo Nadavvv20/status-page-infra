@@ -19,6 +19,9 @@ resource "helm_release" "aws_lb_controller" {
       }
     })
   ]
+  depends_on = [
+    module.root_infrastructure
+  ]
 }
 
 # External Secrets Operator
@@ -75,5 +78,45 @@ resource "helm_release" "cluster_autoscaler" {
         "skip-nodes-with-system-pods" = "false"
       }
     })
+  ]
+}
+
+# Statuspage
+resource "helm_release" "statuspage" {
+  name             = "statuspage"
+  chart            = "${path.module}/../../../helm-statuspage"
+  namespace        = "statuspage"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    yamlencode({
+      config = {
+        useS3        = "False"
+        allowedHosts = "*"
+      }
+      database = {
+        host         = module.root_infrastructure.rds_address
+        user         = "statuspage"
+      }
+
+      redis = {
+        host = module.root_infrastructure.redis_address
+      }
+
+      secrets = {
+        djangoSecretName      = module.root_infrastructure.django_secret_name
+        dbPasswordSecretName  = module.root_infrastructure.db_password_secret_name
+        djangoAdminSecretName = module.root_infrastructure.django_admin_secret_name
+      }
+      
+      image = {
+        tag = "latest"
+      }
+    })
+  ]
+  depends_on = [
+    module.root_infrastructure,
+    helm_release.aws_load_balancer_controller
   ]
 }
