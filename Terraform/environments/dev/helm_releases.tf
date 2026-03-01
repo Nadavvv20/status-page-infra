@@ -120,6 +120,36 @@ resource "helm_release" "statuspage" {
   ]
   depends_on = [
     module.root_infrastructure,
-    helm_release.aws_load_balancer_controller
+    helm_release.aws_lb_controller
+  ]
+}
+
+# Metrics Server
+resource "helm_release" "metrics_server" {
+  name       = "metrics-server"
+  repository = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart      = "metrics-server"
+  namespace  = "kube-system"
+
+  cleanup_on_fail = true
+
+  values = [
+    yamlencode({
+      args = [
+        "--kubelet-insecure-tls"
+      ]
+    
+      resources = {
+        requests = {
+          cpu    = "100m"
+          memory = "200Mi"
+        }
+      }
+    })
+  ]
+
+  depends_on = [
+    module.root_infrastructure.eks,
+    helm_release.aws_lb_controller
   ]
 }

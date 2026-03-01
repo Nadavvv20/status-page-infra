@@ -43,9 +43,6 @@ serviceAccount:
   #  annotations: 
   #  roleArn: "arn:aws:iam::992382545251:role/Nadav-Statuspage-Project-DEV-app-s3-role"
 
-
-
-
 autoscaling:
   enabled: true
   minReplicas: 2
