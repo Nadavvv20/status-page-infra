@@ -43,9 +43,6 @@ serviceAccount:
   #  annotations: 
   #  roleArn: "arn:aws:iam::992382545251:role/Nadav-Statuspage-Project-DEV-app-s3-role"
 
-
-
-
 autoscaling:
   enabled: true
   minReplicas: 2
@@ -66,6 +63,7 @@ secrets:
   djangoSecretName: "Nadav-Statuspage-Project-DEV-django-secret-dev"
   dbPasswordSecretName: "Nadav-Statuspage-Project-DEV-db-password-dev"
   djangoAdminSecretName: "Nadav-Statuspage-Project-DEV-admin-credentials-dev"
+  grafanaGithubSecretName: "nadav-grafana/github-auth"
 
 httpRoute:
   enabled: false

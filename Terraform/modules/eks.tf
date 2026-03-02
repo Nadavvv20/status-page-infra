@@ -3,7 +3,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.30"
+  cluster_version = "1.31"
 
   # Allows access from the internet to run 'kubectl' commands
   cluster_endpoint_public_access = true
@@ -18,7 +18,7 @@ module "eks" {
   # Worker Nodes configuration
   eks_managed_node_groups = {
     app_nodes = {
-      min_size     = 1
+      min_size     = 0
       max_size     = 4
       desired_size = 2
 
