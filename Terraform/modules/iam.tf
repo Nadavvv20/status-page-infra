@@ -92,7 +92,8 @@ resource "aws_iam_policy" "secrets_read_policy" {
         Resource = [  
           aws_secretsmanager_secret.db_password.arn,
           aws_secretsmanager_secret.django_secret.arn,
-          aws_secretsmanager_secret.django_admin_secret.arn
+          aws_secretsmanager_secret.django_admin_secret.arn,
+          data.aws_secretsmanager_secret.grafana_github_auth.arn
         ]
       }
     ]
@@ -118,4 +119,10 @@ module "external_secrets_irsa_role" {
 resource "aws_iam_role_policy_attachment" "secrets_attach" {
   role       = module.external_secrets_irsa_role.iam_role_name
   policy_arn = aws_iam_policy.secrets_read_policy.arn
+}
+
+#############################################
+# Github auth secret
+data "aws_secretsmanager_secret" "grafana_github_auth" {
+  name = "nadav-grafana/github-auth"
 }

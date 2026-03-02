@@ -153,3 +153,47 @@ resource "helm_release" "metrics_server" {
     helm_release.aws_lb_controller
   ]
 }
+
+# Prometheus and Grafana
+resource "helm_release" "prometheus_stack" {
+  name       = "prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  namespace  = "monitoring"
+  create_namespace = true
+
+  values = [
+    yamlencode({
+      grafana = {
+        envFromSecret = "grafana-github-secret"
+        "grafana.ini" = {
+          "auth.github" = {
+            enabled = true
+            allow_sign_up = true
+            allowed_users  = "Nadavvv20"
+          }
+          server = {
+            domain              = ""
+            root_url            = "http://k8s-statuspagegroup-1e30f316ef-938082504.us-east-1.elb.amazonaws.com/grafana/"
+            serve_from_sub_path = true
+          }
+        }
+        
+        ingress = {
+          enabled = true
+          ingressClassName = "alb"
+          annotations      = {
+            "alb.ingress.kubernetes.io/group.name"       = "statuspage-group"
+            "alb.ingress.kubernetes.io/order"            = "10"
+            "alb.ingress.kubernetes.io/scheme"           = "internet-facing"
+            "alb.ingress.kubernetes.io/target-type"      = "ip"
+            "alb.ingress.kubernetes.io/healthcheck-path" = "/api/health"
+          }
+        hosts = [""] 
+        path  = "/grafana"
+        pathType = "Prefix"
+        }
+      }
+    })
+  ]
+}

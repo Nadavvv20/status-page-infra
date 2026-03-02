@@ -63,6 +63,7 @@ secrets:
   djangoSecretName: "Nadav-Statuspage-Project-DEV-django-secret-dev"
   dbPasswordSecretName: "Nadav-Statuspage-Project-DEV-db-password-dev"
   djangoAdminSecretName: "Nadav-Statuspage-Project-DEV-admin-credentials-dev"
+  grafanaGithubSecretName: "nadav-grafana/github-auth"
 
 httpRoute:
   enabled: false
