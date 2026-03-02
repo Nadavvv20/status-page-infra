@@ -1,320 +1,205 @@
-# CI/CD Pipeline with GitHub Actions
+# CI/CD Guide (GitHub Actions Only)
 
-## 🎯 סקירה כללית
-
-הפרויקט משתמש ב-**GitHub Actions טהור** עבור CI/CD, ומחליף את הצורך ב-Jenkins ו-ArgoCD.
-
-### ✅ GitHub Actions מחליף:
-- **Jenkins** → CI Pipeline עם Build, Test, Scan, Push
-- **ArgoCD** → GitOps Sync עם drift detection ואוטומציה
+## מטרת המסמך
+המסמך מרכז את כל דרכי ההפעלה של ה-CI/CD, את כל קבצי ה-workflow הרלוונטיים, ואת ההבדל בין עבודה ב-`CI/CD` branch לבין `main`/`develop`.
 
 ---
 
-## 📁 מבנה Workflows
+## כל קבצי ה-CI/CD במערכת
 
-### Repo: `status-page-app`
-```
-.github/workflows/
-└── app-build.yml        # CI Pipeline - Build → Scan → Push → Trigger
-```
+### App Repository (`status-page-app`)
+- `.github/workflows/app-build.yml`
+  - CI מלא: lint + docker build + trivy + push ל-ECR + trigger ל-infra repo.
 
-### Repo: `status-page-infra`
-```
-.github/workflows/
-├── cd-deploy.yml        # CD Pipeline - Deploy to EKS
-├── gitops-sync.yml      # GitOps Auto-Sync (ArgoCD replacement)
-└── infra-validate.yml   # Terraform & Helm validation
-```
+### Infra Repository (`status-page-infra`)
+- `.github/workflows/infra-validate.yml`
+  - ולידציה לתשתית: Terraform fmt/init/validate + Helm lint/template.
+- `.github/workflows/cd-deploy.yml`
+  - CD ל-EKS דרך Helm.
+- `.github/workflows/gitops-sync.yml`
+  - GitOps sync אוטומטי + drift detection.
 
 ---
 
-## 🔄 תהליך ה-CI/CD המלא
+## דרכי פעולה (Operating Modes)
 
-## 1️⃣ **CI Pipeline** (`app-build.yml`)
+## 1) Full CI from App repo
+**קובץ:** `status-page-app/.github/workflows/app-build.yml`
 
-### טריגרים:
-- Push ל-`main` או `develop`
-- Pull Request ל-`main` או `develop`
+**טריגרים:**
+- `push` על `main`, `develop`, `CI/CD`
+- `pull_request` על `main`, `develop`, `CI/CD`
 
-### שלבים:
+**מה קורה:**
+1. lint לקוד פייתון
+2. build לאימג' דוקר
+3. סריקת אבטחה (Trivy)
+4. push ל-ECR (ב-push)
+5. `repository_dispatch` ל-`status-page-infra`
 
-```yaml
-1. Linting (Python Code Quality)
-   └── flake8 לבדיקת תקינות קוד
-
-2. Build Docker Image
-   └── בניית image עם SHA commit כ-tag
-
-3. Security Scan (Trivy)
-   └── סריקת פגיעויות CRITICAL & HIGH
-
-4. Push to ECR
-   └── העלאה ל-Amazon ECR (רק ב-main/develop)
-
-5. Trigger Infrastructure Update
-   └── שליחת repository_dispatch ל-infra repo
-```
-
-### יתרונות על פני Jenkins:
-✅ אין צורך בתחזוקה של שרת Jenkins  
-✅ סקיילינג אוטומטי של Runners  
-✅ אינטגרציה מובנית עם GitHub  
-✅ OIDC authentication ל-AWS (ללא Access Keys)  
+**מתי להשתמש:**
+- שינויי אפליקציה.
+- כל פעם שרוצים לפרסם image חדש ל-ECR.
 
 ---
 
-## 2️⃣ **CD Pipeline** (`cd-deploy.yml`)
+## 2) Auto CD by Dispatch (App → Infra)
+**קובץ:** `status-page-infra/.github/workflows/cd-deploy.yml`
 
-### טריגרים:
-- `repository_dispatch` מ-app repo
-- Manual trigger (`workflow_dispatch`)
+**טריגר:**
+- `repository_dispatch` עם `event-type: update-image`
 
-### שלבים:
+**מה קורה:**
+1. קבלת `image_tag` מה-app repo
+2. עדכון `helm-statuspage/values.yaml`
+3. commit/push ל-infra repo (GitOps source of truth)
+4. deploy ל-EKS עם `helm upgrade --install --atomic`
+5. ולידציה בסיסית (`pods`, `service`, `ingress`)
 
-```yaml
-1. Update values.yaml
-   └── עדכון image tag ב-Helm chart
-
-2. Commit & Push changes
-   └── שמירת השינוי ב-Git (GitOps pattern)
-
-3. Configure AWS & EKS
-   └── התחברות ל-EKS cluster
-
-4. Deploy with Helm
-   └── helm upgrade --install --atomic
-
-5. Verify Deployment
-   └── בדיקת pods, services, ingress
-```
-
-### מה קורה כאן?
-1. **App repo** דוחף code → GitHub Actions בונה image → שולח event
-2. **Infra repo** מקבל event → מעדכן values.yaml → מפרס ל-EKS
-3. **Git = Source of Truth** (GitOps principle)
+**מתי להשתמש:**
+- זרימת production/staging רגילה אחרי build מוצלח.
 
 ---
 
-## 3️⃣ **GitOps Auto-Sync** (`gitops-sync.yml`)
+## 3) Manual CD (Hotfix / Rollback)
+**קובץ:** `status-page-infra/.github/workflows/cd-deploy.yml`
 
-### טריגרים:
-- Push ל-`helm-statuspage/**` (שינוי במניפסטים)
-- Schedule: כל 5 דקות (כמו ArgoCD)
-- Manual trigger
+**טריגר:**
+- `workflow_dispatch`
 
-### שלבים:
+**מה קורה:**
+- מפעילים ידנית מה-UI עם `image_tag` רצוי (למשל SHA ישן לרולבק).
 
-```yaml
-1. Check Drift
-   └── השוואת deployed values מול Git
-
-2. Sync if Needed
-   └── Helm upgrade אם יש הבדל
-
-3. Verify Health
-   └── בדיקת pods status
-```
-
-### יתרונות על פני ArgoCD:
-✅ אין צורך בהתקנה של ArgoCD בקלאסטר  
-✅ פחות משאבים (CPU/Memory)  
-✅ קונפיגורציה פשוטה יותר  
-✅ אותם עקרונות GitOps  
-⚠️ **חיסרון**: UI פחות מתקדם (אבל יש GitHub UI)
+**מתי להשתמש:**
+- rollback מהיר.
+- deploy של תג ספציפי בלי לחכות ל-pipeline המלא.
 
 ---
 
-## 🔐 הגדרות אבטחה נדרשות
+## 4) Direct CD Test from CI/CD Branch
+**קובץ:** `status-page-infra/.github/workflows/cd-deploy.yml`
 
-### ב-AWS:
-```hcl
-# יצירת OIDC Provider ל-GitHub Actions
-resource "aws_iam_openid_connect_provider" "github_actions" {
-  url = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-  thumbprint_list = [...]
-}
+**טריגר:**
+- `push` על branch `CI/CD`
+- רק אם היה שינוי ב:
+  - `helm-statuspage/**`
+  - `.github/workflows/cd-deploy.yml`
 
-# יצירת IAM Role עם Trust Policy
-resource "aws_iam_role" "github_actions_role" {
-  name = "github-actions-eks-deployer"
-  
-  assume_role_policy = jsonencode({
-    Statement = [{
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Effect = "Allow"
-      Principal = {
-        Federated = aws_iam_openid_connect_provider.github_actions.arn
-      }
-      Condition = {
-        StringEquals = {
-          "token.actions.githubusercontent.com:sub": [
-            "repo:YOUR_ORG/status-page-app:ref:refs/heads/main",
-            "repo:YOUR_ORG/status-page-infra:ref:refs/heads/main"
-          ]
-        }
-      }
-    }]
-  })
-}
+**מה קורה:**
+- deploy ישיר לערך `image.tag` הקיים ב-`values.yaml`.
+- במצב זה לא מתבצע עדכון אוטומטי ל-tag ולא commit נוסף.
 
-# הרשאות: ECR, EKS, Helm
-resource "aws_iam_role_policy_attachment" "github_actions_policy" {
-  role       = aws_iam_role.github_actions_role.name
-  policy_arn = "arn:aws:iam::aws:policy/..." # ECR + EKS
-}
-```
-
-### ב-GitHub:
-
-#### **Secrets נדרשים** (Settings → Secrets → Actions):
-
-**status-page-app repo:**
-```
-AWS_ROLE_ARN = arn:aws:iam::992382545251:role/github-actions-eks-deployer
-PAT_TOKEN = ghp_xxxxxxxxxxxx (Personal Access Token עם repo scope)
-```
-
-**status-page-infra repo:**
-```
-AWS_ROLE_ARN = arn:aws:iam::992382545251:role/github-actions-eks-deployer
-PAT_TOKEN = ghp_xxxxxxxxxxxx
-```
-
-#### איך ליצור PAT (Personal Access Token):
-1. GitHub → Settings → Developer settings → Personal access tokens
-2. Generate new token (classic)
-3. Select scopes: `repo` (full control)
-4. Copy ושמור ב-Secrets
+**מתי להשתמש:**
+- בדיקות pipeline ו-deploy לפני merge ל-`main`.
 
 ---
 
-## 🚀 איך להריץ את ה-Pipeline
+## 5) GitOps Auto Sync (ArgoCD Alternative)
+**קובץ:** `status-page-infra/.github/workflows/gitops-sync.yml`
 
-### הפעלה אוטומטית:
-```bash
-# 1. עדכן קוד באפליקציה
-cd status-page-app
-git add .
-git commit -m "New feature"
-git push origin main
+**טריגרים:**
+- `push` על `main` ו-`CI/CD` עבור `helm-statuspage/**`
+- `schedule` כל 5 דקות
+- `workflow_dispatch`
 
-# → GitHub Actions אוטומטית:
-#    ✓ בונה image
-#    ✓ סורק אבטחה  
-#    ✓ דוחף ל-ECR
-#    ✓ מפעיל deployment ב-infra repo
-#    ✓ מפרס ל-EKS
+**מה קורה:**
+1. משווה `image.tag` בין מצב פרוס (Helm values) לבין Git
+2. אם יש drift → מבצע sync עם Helm
+3. בודק health של הפודים
 
-# 2. GitOps Sync כל 5 דקות
-# → בודק drift ומסנכרן אוטומטית
-```
-
-### הפעלה ידנית:
-```bash
-# דרך GitHub UI:
-1. לך ל-Actions tab
-2. בחר workflow (cd-deploy או gitops-sync)
-3. לחץ "Run workflow"
-4. בחר image tag (או השאר default)
-```
+**מתי להשתמש:**
+- שמירה על התאמה רציפה בין Git לקלאסטר.
+- תחליף מעשי ל-ArgoCD בסביבת MVP/פרויקט גמר.
 
 ---
 
-## 📊 השוואה: GitHub Actions vs Jenkins vs ArgoCD
+## 6) Infra Validation (Quality Gate)
+**קובץ:** `status-page-infra/.github/workflows/infra-validate.yml`
 
-| תכונה | GitHub Actions | Jenkins | ArgoCD |
-|--------|---------------|---------|--------|
-| **אירוח** | SaaS (Managed) | Self-hosted | Self-hosted |
-| **תחזוקה** | ✅ אפס | ❌ רבה | ⚠️ בינונית |
-| **סקיילינג** | ✅ אוטומטי | ❌ ידני | ✅ אוטומטי |
-| **אבטחה** | ✅ OIDC | ⚠️ Access Keys | ✅ ServiceAccount |
-| **GitOps** | ✅ כן | ❌ לא | ✅ כן |
-| **UI** | ⚠️ בסיסי | ✅ מורכב | ✅ מתקדם |
-| **עלות** | 💰 חינם/זול | 💰💰 יקר | 💰 חינם |
+**טריגרים:**
+- `push` על `main`, `develop`, `CI/CD`
+- `pull_request` על `main`, `develop`
 
----
+**מה קורה:**
+- בדיקות פורמט/תקינות ל-Terraform
+- lint/template ל-Helm
 
-## 🎓 עקרונות GitOps ש-GitHub Actions מממש
-
-1. ✅ **Declarative** - כל המצב מוגדר ב-YAML
-2. ✅ **Versioned** - Git הוא מקור האמת
-3. ✅ **Immutable** - Image tags עם SHA
-4. ✅ **Pulled Automatically** - Auto-sync כל 5 דקות
-5. ✅ **Continuously Reconciled** - Drift detection
+**מתי להשתמש:**
+- לפני merge לתשתיות.
 
 ---
 
-## 🔍 מעקב אחר deployments
+## מטריצת טריגרים מהירה
 
-### דרך GitHub UI:
-```
-Repository → Actions → בחר workflow run → ראה לוגים
-```
+| Workflow | main | develop | CI/CD | PR | Schedule | Manual | Dispatch |
+|---|---|---|---|---|---|---|---|
+| app-build.yml | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| infra-validate.yml | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| cd-deploy.yml | ❌* | ❌ | ✅** | ❌ | ❌ | ✅ | ✅ |
+| gitops-sync.yml | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ |
 
-### דרך kubectl:
-```bash
-# pod status
-kubectl get pods -n default -l app.kubernetes.io/name=statuspage
-
-# deployment history
-helm history statuspage -n default
-
-# logs
-kubectl logs -n default -l app=statuspage-web --tail=100
-```
+\* על `main` הריצה מגיעה בעיקר דרך `repository_dispatch` מה-app pipeline.  
+\** על `CI/CD` רץ רק אם יש שינוי ב-`helm-statuspage/**` או ב-`.github/workflows/cd-deploy.yml`.
 
 ---
 
-## 🛠️ Troubleshooting
+## זרימות מומלצות לפי סביבה
 
-### CI נכשל:
-```bash
-# בדוק את ה-workflow logs ב-GitHub Actions
-# שגיאות נפוצות:
-- Docker build failed → בדוק Dockerfile
-- Trivy found CRITICAL → שדרג dependencies
-- ECR push failed → בדוק AWS credentials
-```
+## Development / Testing
+1. עובדים בענף `CI/CD`.
+2. משנים workflow/helm.
+3. `push` → רואים ריצות של CI + validate + CD test.
+4. מתקנים עד שהכל ירוק.
 
-### CD נכשל:
-```bash
-# בדוק Helm deployment
-helm list -n default
-kubectl get events -n default --sort-by='.lastTimestamp'
-
-# בדוק pods
-kubectl describe pod <pod-name> -n default
-```
-
-### GitOps לא מסנכרן:
-```bash
-# הרץ ידנית:
-# Actions → gitops-sync → Run workflow
-
-# בדוק אם schedule פועל:
-# Actions → gitops-sync → ראה runs אחרונים
-```
+## Main / Production Flow
+1. merge ל-`main` ב-app repo.
+2. `app-build.yml` בונה ודוחף image ל-ECR.
+3. dispatch ל-infra repo עם SHA tag.
+4. `cd-deploy.yml` מעדכן values + deploy ל-EKS.
+5. `gitops-sync.yml` שומר על reconciliation רציף.
 
 ---
 
-## 📚 קריאה נוספת
+## דרישות Secrets לשני ה-Repos
 
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [AWS OIDC with GitHub Actions](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services)
-- [Helm Best Practices](https://helm.sh/docs/chart_best_practices/)
-- [GitOps Principles](https://opengitops.dev/)
+חובה להגדיר:
+- `AWS_ROLE_ARN`
+- `PAT_TOKEN`
+
+המלצה:
+- לעבוד עם OIDC בלבד (ללא Access Keys סטטיים).
 
 ---
 
-## ✨ סיכום
+## בדיקות תקינות אחרי Push
 
-**GitHub Actions מחליף בהצלחה את Jenkins ו-ArgoCD:**
+## בדיקת CI
+- Actions ב-app repo: run של `CI - Build, Scan & Push to ECR`.
+- לוודא `Build`, `Trivy`, `ECR push` עברו.
 
-✅ **CI** - Build, Test, Scan, Push (במקום Jenkins)  
-✅ **CD** - Deploy to Kubernetes (במקום manual helm)  
-✅ **GitOps** - Auto-sync עם drift detection (במקום ArgoCD)  
-✅ **אבטחה** - OIDC ללא secrets (Least Privilege)  
-✅ **פשטות** - הכל ב-Git, אין שרתים חיצוניים  
+## בדיקת CD
+- Actions ב-infra repo: run של `CD - Deploy to EKS`.
+- לוודא `Deploy with Helm` ו-`Verify deployment` עברו.
 
-**המלצה**: התחל עם GitHub Actions, ועבור ל-ArgoCD רק אם צריך UI מתקדם או multi-cluster management.
+## בדיקת GitOps
+- Actions ב-infra repo: run של `GitOps - Auto Sync to EKS`.
+- לוודא שאין drift או שהוא תוקן בהצלחה.
+
+---
+
+## תקלות נפוצות
+
+- `AWS credentials` נכשל: בדקו `AWS_ROLE_ARN` ו-Trust policy ל-OIDC.
+- `repository_dispatch` נכשל: בדקו `PAT_TOKEN` עם `repo` scope.
+- `kubectl unauthorized`: בדקו `aws-auth` ב-EKS.
+- `helm upgrade` נכשל: בדקו ערכי secrets/config ו-health של התלויות (RDS/Redis).
+
+---
+
+## סיכום
+GitHub Actions מחליף כאן גם CI (במקום Jenkins) וגם GitOps/CD (במקום ArgoCD) עם 3 דרכי הפעלה פרקטיות:
+1. אוטומטי מה-app pipeline (dispatch)
+2. ידני (`workflow_dispatch`)
+3. בדיקות ישירות מענף `CI/CD` (push-based)
+
+כך אפשר להתקדם מהר בפיתוח, ועדיין לשמור על תהליך release נקי ומבוקר ל-`main`.
