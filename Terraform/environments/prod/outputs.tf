@@ -1,4 +1,4 @@
-# environments/dev/outputs.tf
+# environments/prod/outputs.tf
 
 output "cluster_name" {
   value = module.root_infrastructure.cluster_name

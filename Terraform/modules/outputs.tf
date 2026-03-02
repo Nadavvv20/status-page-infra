@@ -76,3 +76,4 @@ output "django_admin_secret_name" {
   description = "The name of the Django admin credentials secret"
   value       = aws_secretsmanager_secret.django_admin_secret.name
 }
+

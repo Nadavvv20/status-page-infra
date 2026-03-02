@@ -1,4 +1,4 @@
-# dev/helm_releases.tf
+# modules/helm_releases/main.tf
 
 # AWS LB Controller
 resource "helm_release" "aws_lb_controller" {
@@ -9,18 +9,15 @@ resource "helm_release" "aws_lb_controller" {
 
   values = [
     yamlencode({
-      clusterName = module.root_infrastructure.cluster_name
+      clusterName = var.cluster_name
       serviceAccount = {
         create = true
         name   = "aws-load-balancer-controller"
         annotations = {
-          "eks.amazonaws.com/role-arn" = module.root_infrastructure.load_balancer_controller_role_arn
+          "eks.amazonaws.com/role-arn" = var.load_balancer_controller_role_arn
         }
       }
     })
-  ]
-  depends_on = [
-    module.root_infrastructure
   ]
 }
 
@@ -32,7 +29,6 @@ resource "helm_release" "external_secrets" {
   namespace        = "external-secrets"
   create_namespace = true
   
-
   force_update     = true
   cleanup_on_fail  = true
   wait             = true 
@@ -45,10 +41,13 @@ resource "helm_release" "external_secrets" {
         create = true
         name   = "external-secrets"
         annotations = {
-          "eks.amazonaws.com/role-arn" = module.root_infrastructure.external_secrets_irsa_role_arn
+          "eks.amazonaws.com/role-arn" = var.external_secrets_irsa_role_arn
         }
       }
     })
+  ]
+  depends_on = [
+    helm_release.aws_lb_controller
   ]
 }
 
@@ -62,14 +61,14 @@ resource "helm_release" "cluster_autoscaler" {
   values = [
     yamlencode({
       autoDiscovery = {
-        clusterName = module.root_infrastructure.cluster_name
+        clusterName = var.cluster_name
       }
       awsRegion = var.region
       rbac = {
         serviceAccount = {
           name = "cluster-autoscaler"
           annotations = {
-            "eks.amazonaws.com/role-arn" = module.root_infrastructure.cluster_autoscaler_irsa_role_arn
+            "eks.amazonaws.com/role-arn" = var.cluster_autoscaler_irsa_role_arn
           }
         }
       }
@@ -96,18 +95,18 @@ resource "helm_release" "statuspage" {
         allowedHosts = "*"
       }
       database = {
-        host         = module.root_infrastructure.rds_address
+        host         = var.rds_address
         user         = "statuspage"
       }
 
       redis = {
-        host = module.root_infrastructure.redis_address
+        host = var.redis_address
       }
 
       secrets = {
-        djangoSecretName      = module.root_infrastructure.django_secret_name
-        dbPasswordSecretName  = module.root_infrastructure.db_password_secret_name
-        djangoAdminSecretName = module.root_infrastructure.django_admin_secret_name
+        djangoSecretName      = var.django_secret_name
+        dbPasswordSecretName  = var.db_password_secret_name
+        djangoAdminSecretName = var.django_admin_secret_name
       }
       
       image = {
@@ -116,7 +115,6 @@ resource "helm_release" "statuspage" {
     })
   ]
   depends_on = [
-    module.root_infrastructure,
     helm_release.aws_lb_controller
   ]
 }
@@ -146,7 +144,6 @@ resource "helm_release" "metrics_server" {
   ]
 
   depends_on = [
-    module.root_infrastructure.eks,
     helm_release.aws_lb_controller
   ]
 }
@@ -162,6 +159,11 @@ resource "helm_release" "prometheus_stack" {
   values = [
     yamlencode({
       grafana = {
+        persistence = {
+          enabled          = true
+          storageClassName = "gp3"
+          size             = "5Gi"
+        }
         envFromSecret = "grafana-github-secret"
         "grafana.ini" = {
           "auth.github" = {
@@ -189,6 +191,23 @@ resource "helm_release" "prometheus_stack" {
         hosts = [""] 
         path  = "/grafana"
         pathType = "Prefix"
+        }
+      }
+      prometheus = {
+        prometheusSpec = {
+          storageSpec = {
+            volumeClaimTemplate = {
+              spec = {
+                storageClassName = "gp3"
+                accessModes      = ["ReadWriteOnce"]
+                resources = {
+                  requests = {
+                    storage = "10Gi"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     })

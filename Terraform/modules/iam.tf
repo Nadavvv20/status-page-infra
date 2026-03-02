@@ -126,3 +126,9 @@ resource "aws_iam_role_policy_attachment" "secrets_attach" {
 data "aws_secretsmanager_secret" "grafana_github_auth" {
   name = "nadav-grafana/github-auth"
 }
+####################################
+# Add policy to worker nodes role so the ebs csi driver can create disks in aws
+resource "aws_iam_role_policy_attachment" "ebs_csi_policy_attach" {
+  role       = module.eks.eks_managed_node_groups["app_nodes"].iam_role_name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
