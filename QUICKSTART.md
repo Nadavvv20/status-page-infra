@@ -148,8 +148,8 @@ Secret 2: PAT_TOKEN
 **ערוך**: `status-page-app/.github/workflows/app-build.yml`
 
 ```yaml
-# שורה 72 - עדכן שם repository:
-repository: YOUR_GITHUB_USERNAME/status-page-infra
+# אין צורך לעדכן repository ידנית:
+# workflow משתמש ב-${{ github.repository_owner }}/status-page-infra
 ```
 
 **ערוך**: `status-page-infra/.github/workflows/cd-deploy.yml`
@@ -157,6 +157,11 @@ repository: YOUR_GITHUB_USERNAME/status-page-infra
 ```yaml
 # שורה 19 - עדכן שם קלאסטר:
 EKS_CLUSTER_NAME: your-cluster-name
+
+# ה-workflow תומך ב-3 דרכי הפעלה:
+# 1) repository_dispatch מה-app repo
+# 2) workflow_dispatch ידני
+# 3) push ל-CI/CD (רק אם יש שינוי ב-helm-statuspage/** או בקובץ workflow עצמו)
 ```
 
 **ערוך**: `status-page-infra/.github/workflows/gitops-sync.yml`
@@ -164,6 +169,11 @@ EKS_CLUSTER_NAME: your-cluster-name
 ```yaml
 # שורה 18 - עדכן שם קלאסטר:
 EKS_CLUSTER_NAME: your-cluster-name
+
+# טריגרים:
+# push: main + CI/CD (לשינויים ב-helm-statuspage/**)
+# schedule: כל 5 דקות
+# workflow_dispatch: ידני
 ```
 
 ---
@@ -176,8 +186,10 @@ EKS_CLUSTER_NAME: your-cluster-name
 cd status-page-app
 git add .
 git commit -m "feat: enable CI/CD pipeline"
-git push origin main
+git push origin CI/CD
 ```
+
+> לאחר שהבדיקות עוברות ב-`CI/CD`, מומלץ לפתוח PR ולבצע merge ל-`main`.
 
 ### צפה ב-Pipeline:
 
@@ -204,6 +216,8 @@ GitHub → status-page-infra → Actions → "CD - Deploy to EKS"
 - ✅ Deploy with Helm
 - ✅ Verify pods
 
+> הערה: ב-trigger של `push` לענף `CI/CD` ה-deploy רץ לפי `image.tag` הקיים ב-`values.yaml` (ללא commit עדכון tag).
+
 ### בדוק שהאפליקציה עלתה:
 
 ```bash
@@ -228,6 +242,7 @@ kubectl get ingress -n default -o jsonpath='{.items[0].status.loadBalancer.ingre
 - [ ] Secrets נוספו לשני ה-repos
 - [ ] Repository names עודכנו ב-workflows
 - [ ] Cluster name עודכן ב-workflows
+- [ ] נבדקו כל 3 דרכי ההפעלה של cd-deploy
 - [ ] CI Pipeline רץ והצליח
 - [ ] CD Pipeline רץ והצליח
 - [ ] Pods עולים ב-EKS

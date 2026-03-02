@@ -321,27 +321,33 @@ Repository → Settings → Secrets and variables → Actions → New repository
 #### 1. `status-page-app/.github/workflows/app-build.yml`
 
 ```yaml
-# ליין 72 - עדכן את שם הארגון/משתמש שלך
-repository: YOUR_GITHUB_USERNAME/status-page-infra
-```
-
-**להחליף:**
-```yaml
-repository: nadavbh/status-page-infra  # דוגמה
+# אין צורך לעדכן שם repository ידנית
+# ה-workflow משתמש ב:
+repository: ${{ github.repository_owner }}/status-page-infra
 ```
 
 #### 2. `status-page-infra/.github/workflows/cd-deploy.yml`
 
 ```yaml
-# ליין 10 - עדכן שם קלאסטר (אם שונה)
+# עדכן שם קלאסטר (אם שונה)
 EKS_CLUSTER_NAME: Nadav-Statuspage-Project-DEV-cluster-dev
+
+# דרכי הפעלה נתמכות:
+# repository_dispatch (מה-app repo)
+# workflow_dispatch (ידני)
+# push לענף CI/CD (לשינויים ב-helm-statuspage/** או workflow)
 ```
 
 #### 3. `status-page-infra/.github/workflows/gitops-sync.yml`
 
 ```yaml
-# ליין 18 - עדכן שם קלאסטר
+# עדכן שם קלאסטר
 EKS_CLUSTER_NAME: Nadav-Statuspage-Project-DEV-cluster-dev
+
+# טריגרים:
+# push על main + CI/CD עבור helm-statuspage/**
+# schedule כל 5 דקות
+# workflow_dispatch ידני
 ```
 
 ---
@@ -380,7 +386,7 @@ cd status-page-app
 echo "# Test change" >> README.md
 git add README.md
 git commit -m "test: CI pipeline"
-git push origin main
+git push origin CI/CD
 
 # עקוב אחרי workflow:
 # GitHub → status-page-app → Actions → צפה ב-run
@@ -392,6 +398,8 @@ git push origin main
 3. ✅ Trivy scan completes
 4. ✅ Push to ECR succeeds
 5. ✅ Trigger sent to infra repo
+
+> המלצה: לאחר שהבדיקות עוברות ב-`CI/CD`, פותחים PR וממזגים ל-`main`.
 
 ### בדיקה 2: CD Pipeline
 
@@ -414,7 +422,7 @@ cd status-page-infra
 # שנה משהו ב-helm-statuspage/values.yaml
 git add .
 git commit -m "test: gitops sync"
-git push origin main
+git push origin CI/CD
 
 # תוך 5 דקות, GitOps sync צריך לרוץ אוטומטית
 # GitHub → Actions → gitops-sync
@@ -502,6 +510,7 @@ kubectl get events -n default --sort-by='.lastTimestamp'
 - [ ] PAT_TOKEN ב-Secrets של שני ה-repos
 - [ ] שמות קלאסטר עודכנו ב-workflows
 - [ ] Repository names עודכנו ב-workflow triggers
+- [ ] אושרו כל 3 דרכי ההפעלה של cd-deploy
 - [ ] ECR Repository קיים
 - [ ] EKS Cluster פעיל
 - [ ] RDS + Redis פעילים
