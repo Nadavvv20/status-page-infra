@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - CI/CD
     paths:
       - 'helm-statuspage/**'
   schedule:
