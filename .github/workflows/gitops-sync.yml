@@ -1,0 +1,94 @@
+name: GitOps - Auto Sync to EKS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'helm-statuspage/**'
+  schedule:
+    # Sync every 5 minutes (like ArgoCD default)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: Nadav-Statuspage-Project-DEV-cluster-dev
+  HELM_RELEASE_NAME: statuspage
+  HELM_NAMESPACE: default
+
+jobs:
+  sync-to-eks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout infra repo
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.28.0'
+    
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: 'v3.14.0'
+    
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        echo "✅ Connected to EKS cluster"
+    
+    - name: Check if sync needed
+      id: check-sync
+      run: |
+        # Get current deployed values
+        DEPLOYED_TAG=$(helm get values ${{ env.HELM_RELEASE_NAME }} -n ${{ env.HELM_NAMESPACE }} -o json | jq -r '.image.tag // "none"')
+        # Get Git repo values
+        GIT_TAG=$(cat helm-statuspage/values.yaml | grep 'tag:' | awk '{print $2}' | tr -d '"')
+        
+        echo "Deployed tag: $DEPLOYED_TAG"
+        echo "Git repo tag: $GIT_TAG"
+        
+        if [ "$DEPLOYED_TAG" != "$GIT_TAG" ]; then
+          echo "SYNC_NEEDED=true" >> $GITHUB_OUTPUT
+          echo "⚠️ Drift detected! Sync needed."
+        else
+          echo "SYNC_NEEDED=false" >> $GITHUB_OUTPUT
+          echo "✅ No drift detected. Cluster is in sync."
+        fi
+    
+    - name: Sync deployment
+      if: steps.check-sync.outputs.SYNC_NEEDED == 'true'
+      run: |
+        helm upgrade --install ${{ env.HELM_RELEASE_NAME }} ./helm-statuspage \
+          --namespace ${{ env.HELM_NAMESPACE }} \
+          --wait \
+          --timeout 10m \
+          --atomic
+        echo "✅ Sync complete"
+    
+    - name: Verify deployment health
+      if: steps.check-sync.outputs.SYNC_NEEDED == 'true'
+      run: |
+        kubectl get pods -n ${{ env.HELM_NAMESPACE }} -l app.kubernetes.io/name=statuspage
+        
+        # Check if all pods are running
+        NOT_RUNNING=$(kubectl get pods -n ${{ env.HELM_NAMESPACE }} -l app.kubernetes.io/name=statuspage --field-selector=status.phase!=Running --no-headers 2>/dev/null | wc -l)
+        
+        if [ "$NOT_RUNNING" -eq 0 ]; then
+          echo "✅ All pods are healthy"
+        else
+          echo "⚠️ Warning: Some pods are not running"
+          kubectl get pods -n ${{ env.HELM_NAMESPACE }} -l app.kubernetes.io/name=statuspage
+        fi
