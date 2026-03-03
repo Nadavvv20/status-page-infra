@@ -18,7 +18,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  EKS_CLUSTER_NAME: Nadav-Statuspage-Project-DEV-cluster-dev
+  EKS_CLUSTER_NAME: Nadav-Statuspage-EKS-DEV
   HELM_RELEASE_NAME: statuspage
   HELM_NAMESPACE: default
 
