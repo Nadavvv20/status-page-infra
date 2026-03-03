@@ -1,5 +1,22 @@
 # GitHub Actions IAM Module for AWS
 
+module "github_actions_iam" {
+  source = "../../modules/github-actions-iam"
+
+  github_org       = "Nadavvv20"
+  app_repo_name    = "status-page-app"
+  infra_repo_name  = "status-page-infra"
+  project_name     = "statuspage"
+
+  ecr_repository_arn = "arn:aws:ecr:us-east-1:992382545251:repository/nadav-statuspage"
+  eks_cluster_name   = "Nadav-Statuspage-Project-DEV-cluster-dev"
+}
+
+output "github_actions_role_arn" {
+  value = module.github_actions_iam.github_actions_role_arn
+  description = "Copy this ARN to GitHub Secrets as AWS_ROLE_ARN"
+}
+
 variable "github_org" {
   description = "GitHub organization or username"
   type        = string
