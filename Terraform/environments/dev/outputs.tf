@@ -35,3 +35,8 @@ output "statuspage_app_irsa_arn" {
 output "cluster_autoscaler_irsa_role_arn" {
   value = module.root_infrastructure.cluster_autoscaler_irsa_role_arn
 }
+
+output "github_actions_role_arn" {
+  description = "GitHub Actions IAM Role ARN - Add to GitHub Secrets as AWS_ROLE_ARN"
+  value       = module.github_actions_standalone.github_actions_role_arn
+}
