@@ -115,7 +115,8 @@ resource "helm_release" "statuspage" {
     })
   ]
   depends_on = [
-    helm_release.aws_lb_controller
+    helm_release.aws_lb_controller,
+    helm_release.external_secrets
   ]
 }
 
@@ -173,7 +174,7 @@ resource "helm_release" "prometheus_stack" {
           }
           server = {
             domain              = ""
-            root_url            = "http://k8s-statuspagegroup-1e30f316ef-938082504.us-east-1.elb.amazonaws.com/grafana/"
+            root_url            = "http://k8s-statuspagegroup-1e30f316ef-1943142280.us-east-1.elb.amazonaws.com/grafana/"
             serve_from_sub_path = true
           }
         }

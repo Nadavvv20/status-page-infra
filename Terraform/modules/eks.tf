@@ -18,7 +18,7 @@ module "eks" {
   # Worker Nodes configuration
   eks_managed_node_groups = {
     app_nodes = {
-      min_size     = 0
+      min_size     = 2
       max_size     = 4
       desired_size = 2
 
@@ -30,8 +30,9 @@ module "eks" {
 
       tags = {
         NodeGroup = "app-nodes"
-        "k8s.io/cluster-autoscaler/enabled"              = "true"
+        "k8s.io/cluster-autoscaler/enabled"             = "true"
         "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+        "kubernetes.io/cluster/${var.cluster_name}"     = "owned"
         Name = "${var.project_name}-Worker-Node"
       }
     }
