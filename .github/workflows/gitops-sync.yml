@@ -16,7 +16,7 @@ env:
   AWS_REGION: us-east-1
   EKS_CLUSTER_NAME: Nadav-Statuspage-EKS-DEV
   HELM_RELEASE_NAME: statuspage
-  HELM_NAMESPACE: default
+  HELM_NAMESPACE: statuspage
 
 jobs:
   sync-to-eks:
@@ -44,11 +44,30 @@ jobs:
       uses: azure/setup-helm@v4
       with:
         version: 'v3.14.0'
+
+    - name: Install jq (for JSON parsing)
+      run: |
+        sudo apt-get update && sudo apt-get install -y jq
     
     - name: Update kubeconfig
       run: |
         aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         echo "✅ Connected to EKS cluster"
+
+    - name: Ensure Helm namespace exists
+      run: |
+        if kubectl get namespace ${{ env.HELM_NAMESPACE }} >/dev/null 2>&1; then
+          echo "Namespace '${{ env.HELM_NAMESPACE }}' already exists"
+        else
+          kubectl create namespace ${{ env.HELM_NAMESPACE }}
+          echo "Created namespace '${{ env.HELM_NAMESPACE }}'"
+        fi
+
+    - name: Debug cluster info
+      run: |
+        kubectl config current-context
+        kubectl cluster-info
+        kubectl get nodes -o wide
     
     - name: Check if sync needed
       id: check-sync

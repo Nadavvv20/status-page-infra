@@ -20,7 +20,7 @@ env:
   AWS_REGION: us-east-1
   EKS_CLUSTER_NAME: Nadav-Statuspage-EKS-DEV
   HELM_RELEASE_NAME: statuspage
-  HELM_NAMESPACE: default
+  HELM_NAMESPACE: statuspage
 
 jobs:
   update-and-deploy:
@@ -84,6 +84,30 @@ jobs:
         aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         kubectl cluster-info
         echo "✅ Connected to EKS cluster"
+
+    - name: Ensure Helm namespace exists
+      run: |
+        if kubectl get namespace ${{ env.HELM_NAMESPACE }} >/dev/null 2>&1; then
+          echo "Namespace '${{ env.HELM_NAMESPACE }}' already exists"
+        else
+          kubectl create namespace ${{ env.HELM_NAMESPACE }}
+          echo "Created namespace '${{ env.HELM_NAMESPACE }}'"
+        fi
+
+    - name: Verify EKS connection (debug)
+      run: |
+        echo "--- kubectl version ---"
+        kubectl version --client && kubectl version --short
+        echo "--- current context ---"
+        kubectl config current-context
+        echo "--- kubeconfig (minified) ---"
+        kubectl config view --minify
+        echo "--- cluster info ---"
+        kubectl cluster-info
+        echo "--- nodes ---"
+        kubectl get nodes -o wide
+        echo "--- namespaces ---"
+        kubectl get namespaces
     
     - name: Deploy with Helm
       run: |
