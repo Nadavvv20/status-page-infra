@@ -5,7 +5,7 @@ worker:
 image:
   repository: 992382545251.dkr.ecr.us-east-1.amazonaws.com/nadav-statuspage
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "229d8cb17a77ab4a043d7d1589bb3185aa030245"
 
 service:
   type: ClusterIP

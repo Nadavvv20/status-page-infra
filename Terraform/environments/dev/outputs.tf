@@ -47,3 +47,7 @@ output "django_secret_name" {
 output "django_admin_secret_name" {
   value = module.root_infrastructure.django_admin_secret_name
 }
+output "github_actions_role_arn" {
+  description = "GitHub Actions IAM Role ARN - Add to GitHub Secrets as AWS_ROLE_ARN"
+  value       = module.github_actions_standalone.github_actions_role_arn
+}

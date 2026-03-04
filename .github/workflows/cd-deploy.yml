@@ -1,0 +1,139 @@
+name: CD - Deploy to EKS
+
+on:
+  repository_dispatch:
+    types: [update-image]
+  push:
+    branches:
+      - CI/CD
+    paths:
+      - 'helm-statuspage/**'
+      - '.github/workflows/cd-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        default: 'latest'
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: Nadav-Statuspage-EKS-DEV
+  HELM_RELEASE_NAME: statuspage
+  HELM_NAMESPACE: statuspage
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+    - name: Checkout infra repo
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PAT_TOKEN }}
+    
+    - name: Set image tag
+      id: set-tag
+      run: |
+        if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+          IMAGE_TAG="${{ github.event.client_payload.image_tag }}"
+        elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+        else
+          IMAGE_TAG=$(grep '^  tag:' helm-statuspage/values.yaml | awk '{print $2}' | tr -d '"')
+        fi
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "Deploying image tag: $IMAGE_TAG"
+    
+    - name: Update values.yaml with new image tag
+      if: github.event_name != 'push'
+      run: |
+        sed -i 's/tag: ".*"/tag: "${{ steps.set-tag.outputs.IMAGE_TAG }}"/' helm-statuspage/values.yaml
+        echo "✅ Updated image tag in values.yaml"
+    
+    - name: Commit and push changes
+      if: github.event_name != 'push'
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+        git add helm-statuspage/values.yaml
+        git commit -m "Update image tag to ${{ steps.set-tag.outputs.IMAGE_TAG }}" || echo "No changes to commit"
+        git push || echo "No changes to push"
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.28.0'
+    
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: 'v3.14.0'
+    
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        kubectl cluster-info
+        echo "✅ Connected to EKS cluster"
+
+    - name: Ensure Helm namespace exists
+      run: |
+        if kubectl get namespace ${{ env.HELM_NAMESPACE }} >/dev/null 2>&1; then
+          echo "Namespace '${{ env.HELM_NAMESPACE }}' already exists"
+        else
+          kubectl create namespace ${{ env.HELM_NAMESPACE }}
+          echo "Created namespace '${{ env.HELM_NAMESPACE }}'"
+        fi
+
+    - name: Verify EKS connection (debug)
+      continue-on-error: true
+      run: |
+        echo "--- kubectl version ---"
+        kubectl version --client || true
+        echo "--- kubectl version (json) ---"
+        kubectl version -o json || true
+        echo "--- current context ---"
+        kubectl config current-context
+        echo "--- kubeconfig (minified) ---"
+        kubectl config view --minify
+        echo "--- cluster info ---"
+        kubectl cluster-info
+        echo "--- nodes ---"
+        kubectl get nodes -o wide
+        echo "--- namespaces ---"
+        kubectl get namespaces
+    
+    - name: Deploy with Helm
+      run: |
+        helm upgrade --install ${{ env.HELM_RELEASE_NAME }} ./helm-statuspage \
+          --namespace ${{ env.HELM_NAMESPACE }} \
+          --set image.tag=${{ steps.set-tag.outputs.IMAGE_TAG }} \
+          --wait \
+          --timeout 10m \
+          --atomic
+        echo "✅ Deployment complete"
+    
+    - name: Verify deployment
+      run: |
+        kubectl get pods -n ${{ env.HELM_NAMESPACE }} -l app.kubernetes.io/name=statuspage
+        kubectl get svc -n ${{ env.HELM_NAMESPACE }} -l app.kubernetes.io/name=statuspage
+        echo "✅ Deployment verified"
+    
+    - name: Get Ingress URL
+      run: |
+        echo "Waiting for ALB to be provisioned..."
+        sleep 30
+        kubectl get ingress -n ${{ env.HELM_NAMESPACE }}
+        ALB_URL=$(kubectl get ingress -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}')
+        if [ -n "$ALB_URL" ]; then
+          echo "🌐 Application URL: http://$ALB_URL"
+        fi
