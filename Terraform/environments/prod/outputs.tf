@@ -1,4 +1,4 @@
-# environments/dev/outputs.tf
+# environments/prod/outputs.tf
 
 output "cluster_name" {
   value = module.root_infrastructure.cluster_name
@@ -34,4 +34,16 @@ output "statuspage_app_irsa_arn" {
 
 output "cluster_autoscaler_irsa_role_arn" {
   value = module.root_infrastructure.cluster_autoscaler_irsa_role_arn
+}
+
+output "db_password_secret_name" {
+  value = module.root_infrastructure.db_password_secret_name
+}
+
+output "django_secret_name" {
+  value = module.root_infrastructure.django_secret_name
+}
+
+output "django_admin_secret_name" {
+  value = module.root_infrastructure.django_admin_secret_name
 }

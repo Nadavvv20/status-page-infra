@@ -62,3 +62,4 @@ variable "enable_s3_assets" {
   description = "Toggles the creation of S3 bucket and IRSA resources"
   type        = bool
 }
+
