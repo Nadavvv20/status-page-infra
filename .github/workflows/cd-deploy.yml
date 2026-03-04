@@ -95,9 +95,12 @@ jobs:
         fi
 
     - name: Verify EKS connection (debug)
+      continue-on-error: true
       run: |
         echo "--- kubectl version ---"
-        kubectl version --client && kubectl version --short
+        kubectl version --client || true
+        echo "--- kubectl version (json) ---"
+        kubectl version -o json || true
         echo "--- current context ---"
         kubectl config current-context
         echo "--- kubeconfig (minified) ---"
