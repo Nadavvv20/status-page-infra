@@ -60,6 +60,9 @@ resource "helm_release" "cluster_autoscaler" {
 
   values = [
     yamlencode({
+      image = {
+        tag = "v1.31.0"
+      }
       autoDiscovery = {
         clusterName = var.cluster_name
       }
