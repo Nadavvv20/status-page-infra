@@ -60,9 +60,9 @@ resources:
 
 # Names of the secrets inside of AWS Secrets Manager
 secrets:
-  djangoSecretName: "Nadav-Statuspage-Project-DEV-django-secret-dev"
-  dbPasswordSecretName: "Nadav-Statuspage-Project-DEV-db-password-dev"
-  djangoAdminSecretName: "Nadav-Statuspage-Project-DEV-admin-credentials-dev"
+  djangoSecretName: "Nadav-Statuspage-Project-DEV-django-secret-Dev"
+  dbPasswordSecretName: "Nadav-Statuspage-Project-DEV-db-password-Dev"
+  djangoAdminSecretName: "Nadav-Statuspage-Project-DEV-admin-credentials-Dev"
   grafanaGithubSecretName: "nadav-grafana/github-auth"
 
 httpRoute:

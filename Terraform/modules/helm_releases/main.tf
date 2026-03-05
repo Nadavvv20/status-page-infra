@@ -60,6 +60,9 @@ resource "helm_release" "cluster_autoscaler" {
 
   values = [
     yamlencode({
+      image = {
+        tag = "v1.31.0"
+      }
       autoDiscovery = {
         clusterName = var.cluster_name
       }
@@ -77,46 +80,6 @@ resource "helm_release" "cluster_autoscaler" {
         "skip-nodes-with-system-pods" = "false"
       }
     })
-  ]
-}
-
-# Statuspage
-resource "helm_release" "statuspage" {
-  name             = "statuspage"
-  chart            = "${path.module}/../../../helm-statuspage"
-  namespace        = "statuspage"
-  create_namespace = true
-  cleanup_on_fail  = true
-
-  values = [
-    yamlencode({
-      config = {
-        useS3        = "False"
-        allowedHosts = "*"
-      }
-      database = {
-        host         = var.rds_address
-        user         = "statuspage"
-      }
-
-      redis = {
-        host = var.redis_address
-      }
-
-      secrets = {
-        djangoSecretName      = var.django_secret_name
-        dbPasswordSecretName  = var.db_password_secret_name
-        djangoAdminSecretName = var.django_admin_secret_name
-      }
-      
-      image = {
-        tag = "latest"
-      }
-    })
-  ]
-  depends_on = [
-    helm_release.aws_lb_controller,
-    helm_release.external_secrets
   ]
 }
 
@@ -160,6 +123,26 @@ resource "helm_release" "prometheus_stack" {
   values = [
     yamlencode({
       grafana = {
+
+        deploymentStrategy = {
+          type = "Recreate"
+        }
+
+        image = {
+        tag = "11.5.0"
+        }
+        # Add Loki as a data source
+        additionalDataSources = [
+          {
+            name      = "Loki"
+            type      = "loki"
+            url       = "http://loki:3100"
+            access    = "proxy"
+            isDefault = false
+          }
+        ]
+
+
         persistence = {
           enabled          = true
           storageClassName = "gp3"
@@ -208,6 +191,41 @@ resource "helm_release" "prometheus_stack" {
                 }
               }
             }
+          }
+        }
+      }
+    })
+  ]
+}
+
+# Logs Monitoring
+resource "helm_release" "loki" {
+  name       = "loki"
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "loki-stack"
+  namespace  = "monitoring"
+  create_namespace = true
+
+  values = [
+    yamlencode({
+      loki = {
+        image = {
+          tag = "2.9.10" 
+        }
+        persistence = {
+          enabled = true
+          size    = "10Gi"
+          storageClassName = "gp3"
+        }
+      }
+      promtail = {
+        enabled = true
+      }
+      grafana = {
+        enabled = false
+        sidecar = {
+          datasources = {
+            enabled = false
           }
         }
       }
