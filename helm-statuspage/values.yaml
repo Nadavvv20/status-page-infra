@@ -22,20 +22,7 @@ config:
   adminEmail: "admin@example.com"
 
 
-# DB information
-database:
-  engine: "django.db.backends.postgresql"
-  name: "statuspage"
-  user: "statuspage"
-  host: "nadav-statuspage-project-dev-db.cx248m4we6k7.us-east-1.rds.amazonaws.com"
-  port: 5432
 
-# Redis information
-redis:
-  host: "nadav-statuspage-project-dev-redis.7fftml.ng.0001.use1.cache.amazonaws.com"
-  port: 6379
-  tasksDb: 0
-  cachingDb: 1
 
 # IAM S3 Role (Static files bucket)
 serviceAccount:
@@ -60,9 +47,6 @@ resources:
 
 # Names of the secrets inside of AWS Secrets Manager
 secrets:
-  djangoSecretName: "Nadav-Statuspage-Project-DEV-django-secret-Dev"
-  dbPasswordSecretName: "Nadav-Statuspage-Project-DEV-db-password-Dev"
-  djangoAdminSecretName: "Nadav-Statuspage-Project-DEV-admin-credentials-Dev"
   grafanaGithubSecretName: "nadav-grafana/github-auth"
 
 httpRoute:
