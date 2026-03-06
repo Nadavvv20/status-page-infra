@@ -23,17 +23,17 @@ spec:
             - "default"
           envFrom:
             - configMapRef:
-                name: {{ include "statuspage.fullname" . }}-config
+                name: statuspage-app-config
           env:
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "statuspage.fullname" . }}-secrets
+                  name: statuspage-secrets
                   key: DB_PASSWORD
             - name: SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "statuspage.fullname" . }}-secrets
+                  name: statuspage-secrets
                   key: SECRET_KEY
 
           resources:

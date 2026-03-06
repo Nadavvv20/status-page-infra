@@ -145,10 +145,13 @@ resource "helm_release" "prometheus_stack" {
 
         persistence = {
           enabled          = true
+          accessModes = ["ReadWriteOnce"]
+          volumeName       = "pvc-161a160d-863b-46d4-a57f-2d7699181914"
           storageClassName = "gp3"
           size             = "5Gi"
+          
         }
-        envFromSecret = "grafana-github-secret"
+        envFromSecret = "grafana-github-secret" 
         "grafana.ini" = {
           "auth.github" = {
             enabled = true
@@ -157,7 +160,7 @@ resource "helm_release" "prometheus_stack" {
           }
           server = {
             domain              = ""
-            root_url            = "http://k8s-statuspagegroup-1e30f316ef-1943142280.us-east-1.elb.amazonaws.com/grafana/"
+            root_url            = "http://k8s-statuspagegroup-1e30f316ef-1437681547.us-east-1.elb.amazonaws.com/grafana/"
             serve_from_sub_path = true
           }
         }
