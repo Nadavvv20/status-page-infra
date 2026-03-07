@@ -15,15 +15,24 @@ module "eks" {
   # Allows the pods to receive IRSA
   enable_irsa = true
 
+
   # Worker Nodes configuration
   eks_managed_node_groups = {
     app_nodes = {
-      min_size     = 3
-      max_size     = 4
-      desired_size = 3
+      name         = "app-nodes"
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
 
       instance_types = var.instance_types
       capacity_type  = var.capacity_type
+      ami_type       = var.ami_type
+      iam_role_additional_policies = {
+      describe_addon = aws_iam_policy.eks_describe_addon.arn
+      }
+      enable_bootstrap_user_data = true
+      enable_prefix_delegation = true
+      
 
       # Connect only to the private app subnets
       subnet_ids = module.vpc.private_subnets

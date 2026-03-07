@@ -127,8 +127,71 @@ data "aws_secretsmanager_secret" "grafana_github_auth" {
   name = "nadav-grafana/github-auth"
 }
 ####################################
-# Add policy to worker nodes role so the ebs csi driver can create disks in aws
-resource "aws_iam_role_policy_attachment" "ebs_csi_policy_attach" {
-  role       = module.eks.eks_managed_node_groups["app_nodes"].iam_role_name
+# --- IAM Role for EBS CSI Driver ---
+data "aws_iam_policy_document" "ebs_csi_assume_role" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(module.eks.oidc_provider, "https://", "")}:sub"
+      values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+    }
+  }
+}
+resource "aws_iam_role" "ebs_csi_irsa" {
+  name               = "${var.cluster_name}-ebs-csi-irsa"
+  assume_role_policy = data.aws_iam_policy_document.ebs_csi_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ebs_csi_irsa.name
+}
+
+ # --- IAM Role for VPC CNI (aws-node) ---
+data "aws_iam_policy_document" "vpc_cni_assume_role" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(module.eks.oidc_provider, "https://", "")}:sub"
+      values   = ["system:serviceaccount:kube-system:aws-node"]
+    }
+  }
+}
+
+resource "aws_iam_role" "vpc_cni_irsa" {
+  name               = "${var.cluster_name}-vpc-cni-irsa"
+  assume_role_policy = data.aws_iam_policy_document.vpc_cni_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "vpc_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.vpc_cni_irsa.name
+}
+
+resource "aws_iam_policy" "eks_describe_addon" {
+  name        = "EKSDescribeAddonPolicy"
+  description = "Allows nodes to describe addons for AL2023 capacity calculation"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["eks:DescribeAddon"]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
 }
