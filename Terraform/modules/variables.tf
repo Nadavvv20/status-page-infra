@@ -63,3 +63,7 @@ variable "enable_s3_assets" {
   type        = bool
 }
 
+variable "ami_type" {
+  description = "Defines the AMI type of the nodes"
+  default = "AL2023_x86_64_STANDARD"
+}
