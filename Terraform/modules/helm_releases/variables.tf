@@ -47,3 +47,23 @@ variable "django_admin_secret_name" {
   description = "Django admin secret name in AWS Secrets Manager"
   type        = string
 }
+
+variable "thanos_irsa_role_arn" {
+  description = "Role ARN for Thanos IRSA"
+  type        = string
+}
+
+variable "thanos_objstore_secret_name" {
+  description = "Name of the secret containing Thanos object storage config"
+  type        = string
+}
+
+variable "loki_irsa_role_arn" {
+  description = "Role ARN for Loki IRSA"
+  type        = string
+}
+
+variable "monitoring_data_bucket_id" {
+  description = "The ID of the S3 bucket used for monitoring data"
+  type        = string
+}

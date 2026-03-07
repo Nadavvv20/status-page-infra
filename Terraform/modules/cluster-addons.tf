@@ -39,3 +39,36 @@ resource "aws_eks_addon" "vpc_cni" {
     }
   })
 }
+
+#######################################################################3
+
+# Storage class for EFS
+resource "kubernetes_storage_class_v1" "efs_sc" {
+  metadata {
+    name = "efs-sc"
+  }
+  storage_provisioner = "efs.csi.aws.com"
+  parameters = {
+    provisioningMode = "efs-ap"
+    fileSystemId     = aws_efs_file_system.grafana_storage.id
+    directoryPerms   = "700"
+  }
+}
+
+# Set S3 monitoring Bucket configurations for Thanos
+resource "kubernetes_secret" "thanos_objstore" {
+  metadata {
+    name      = "thanos-objstore-config"
+    namespace = "monitoring"
+  }
+  data = {
+    "thanos.yaml" = yamlencode({
+      type = "s3"
+      config = {
+        bucket   = aws_s3_bucket.monitoring_data.id
+        endpoint = "s3.${var.region}.amazonaws.com"
+        prefix   = "thanos/"
+      }
+    })
+  }
+}

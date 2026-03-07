@@ -77,3 +77,7 @@ output "django_admin_secret_name" {
   value       = aws_secretsmanager_secret.django_admin_secret.name
 }
 
+output "thanos_irsa_role_arn" { value = aws_iam_role.thanos_irsa.arn }
+output "thanos_objstore_secret_name" { value = kubernetes_secret.thanos_objstore.metadata[0].name }
+output "loki_irsa_role_arn" { value = aws_iam_role.loki_irsa.arn }
+output "monitoring_data_bucket_id" { value = aws_s3_bucket.monitoring_data.id }

@@ -112,26 +112,23 @@ resource "helm_release" "metrics_server" {
   ]
 }
 
-# Prometheus and Grafana
+# Prometheus and Grafana 
 resource "helm_release" "prometheus_stack" {
-  name       = "prometheus-stack"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
-  namespace  = "monitoring"
+  name             = "prometheus-stack"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "kube-prometheus-stack"
+  namespace        = "monitoring"
   create_namespace = true
 
   values = [
     yamlencode({
       grafana = {
-
         deploymentStrategy = {
           type = "Recreate"
         }
-
         image = {
-        tag = "11.5.0"
+          tag = "11.5.0"
         }
-        # Add Loki as a data source
         additionalDataSources = [
           {
             name      = "Loki"
@@ -139,24 +136,27 @@ resource "helm_release" "prometheus_stack" {
             url       = "http://loki:3100"
             access    = "proxy"
             isDefault = false
+          },
+          {
+            name      = "Thanos"
+            type      = "prometheus"
+            url       = "http://thanos-query:9090"
+            access    = "proxy"
+            isDefault = true
           }
         ]
-
-
         persistence = {
           enabled          = true
-          accessModes = ["ReadWriteOnce"]
-          volumeName       = "pvc-161a160d-863b-46d4-a57f-2d7699181914"
-          storageClassName = "gp3"
+          accessModes      = ["ReadWriteMany"]
+          storageClassName = "efs-sc"
           size             = "5Gi"
-          
         }
-        envFromSecret = "grafana-github-secret" 
+        envFromSecret = "grafana-github-secret"
         "grafana.ini" = {
           "auth.github" = {
-            enabled = true
+            enabled       = true
             allow_sign_up = true
-            allowed_users  = "Nadavvv20"
+            allowed_users = "Nadavvv20"
           }
           server = {
             domain              = ""
@@ -164,35 +164,39 @@ resource "helm_release" "prometheus_stack" {
             serve_from_sub_path = true
           }
         }
-        
         ingress = {
-          enabled = true
+          enabled          = true
           ingressClassName = "alb"
-          annotations      = {
+          annotations = {
             "alb.ingress.kubernetes.io/group.name"       = "statuspage-group"
             "alb.ingress.kubernetes.io/order"            = "10"
             "alb.ingress.kubernetes.io/scheme"           = "internet-facing"
             "alb.ingress.kubernetes.io/target-type"      = "ip"
             "alb.ingress.kubernetes.io/healthcheck-path" = "/api/health"
           }
-        hosts = [""] 
-        path  = "/grafana"
-        pathType = "Prefix"
+          hosts    = [""]
+          path     = "/grafana"
+          pathType = "Prefix"
         }
       }
       prometheus = {
+        serviceAccount = {
+          create = true
+          name   = "prometheus-prometheus-stack-kube-prom-prometheus"
+          annotations = {
+            "eks.amazonaws.com/role-arn" = var.thanos_irsa_role_arn
+          }
+        }
         prometheusSpec = {
+          thanos = {
+            objectStorageConfig = {
+              name = var.thanos_objstore_secret_name
+              key  = "thanos.yaml"
+            }
+          }
           storageSpec = {
-            volumeClaimTemplate = {
-              spec = {
-                storageClassName = "gp3"
-                accessModes      = ["ReadWriteOnce"]
-                resources = {
-                  requests = {
-                    storage = "10Gi"
-                  }
-                }
-              }
+            emptyDir = {
+              medium = "Memory"
             }
           }
         }
@@ -201,24 +205,88 @@ resource "helm_release" "prometheus_stack" {
   ]
 }
 
-# Logs Monitoring
+resource "helm_release" "thanos" {
+  name             = "thanos"
+  repository       = "https://charts.bitnami.com/bitnami"
+  chart            = "thanos"
+  namespace        = "monitoring"
+  create_namespace = true
+
+  depends_on = [helm_release.prometheus_stack]
+
+  values = [
+    yamlencode({
+      objstoreConfig = var.thanos_objstore_secret_name
+      query = {
+        enabled = true
+        stores  = ["prometheus-stack-kube-prom-prometheus-thanos:10901"]
+      }
+      storegateway = {
+        enabled = true
+        serviceAccount = {
+          create = true
+          annotations = {
+            "eks.amazonaws.com/role-arn" = var.thanos_irsa_role_arn
+          }
+        }
+      }
+      compactor = {
+        enabled = false 
+      }
+    })
+  ]
+}
+
+# Loki - log monitoring
 resource "helm_release" "loki" {
-  name       = "loki"
-  repository = "https://grafana.github.io/helm-charts"
-  chart      = "loki-stack"
-  namespace  = "monitoring"
+  name             = "loki"
+  repository       = "https://grafana.github.io/helm-charts"
+  chart            = "loki-stack"
+  namespace        = "monitoring"
   create_namespace = true
 
   values = [
     yamlencode({
       loki = {
         image = {
-          tag = "2.9.10" 
+          tag = "2.9.10"
+        }
+        serviceAccount = {
+          create = true
+          name   = "loki"
+          annotations = {
+            "eks.amazonaws.com/role-arn" = var.loki_irsa_role_arn
+          }
+        }
+        config = {
+          schema_config = {
+            configs = [
+              {
+                from         = "2020-10-24"
+                store        = "boltdb-shipper"
+                object_store = "s3"
+                schema       = "v11"
+                index = {
+                  prefix = "index_"
+                  period = "24h"
+                }
+              }
+            ]
+          }
+          storage_config = {
+            aws = {
+              s3 = "s3://${var.region}/${var.monitoring_data_bucket_id}/loki"
+            }
+            boltdb_shipper = {
+              active_index_directory = "/data/loki/boltdb-shipper-active"
+              cache_location         = "/data/loki/boltdb-shipper-cache"
+              cache_ttl              = "24h"
+              shared_store           = "s3"
+            }
+          }
         }
         persistence = {
-          enabled = true
-          size    = "10Gi"
-          storageClassName = "gp3"
+          enabled = false
         }
       }
       promtail = {
