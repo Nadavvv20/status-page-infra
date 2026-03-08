@@ -56,7 +56,7 @@ resource "kubernetes_storage_class_v1" "efs_sc" {
 }
 
 # Set S3 monitoring Bucket configurations for Thanos
-resource "kubernetes_secret" "thanos_objstore" {
+resource "kubernetes_secret_v1" "thanos_objstore" {
   metadata {
     name      = "thanos-objstore-config"
     namespace = "monitoring"

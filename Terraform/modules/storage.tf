@@ -40,6 +40,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "monitoring_data_lifecycle" {
     id     = "delete-old-monitoring-data"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = 14 # Deletes files that are 14 days old
     }
