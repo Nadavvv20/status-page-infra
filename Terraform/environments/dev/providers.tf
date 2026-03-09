@@ -13,6 +13,10 @@ terraform {
       source  = "hashicorp/helm"
       version = ">= 2.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
     }
     # Save the state in S3 for data durability
     backend "s3" {
@@ -37,4 +41,13 @@ provider "helm" {
     }
   }
 }
-  
+
+provider "kubernetes" {
+  host                   = module.root_infrastructure.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.root_infrastructure.cluster_certificate_authority_data)
+  exec {
+    api_version = "client.authentication.k8s.io/v1"
+    args        = ["eks", "get-token", "--cluster-name", module.root_infrastructure.cluster_name]
+    command     = "aws"
+  }
+}

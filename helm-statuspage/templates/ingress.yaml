@@ -5,7 +5,8 @@ metadata:
   labels:
     {{- include "statuspage.labels" . | nindent 4 }}
   annotations:
-    # This tells K8s to use ALB
+    alb.ingress.kubernetes.io/group.name: "statuspage-group"
+    alb.ingress.kubernetes.io/order: '100'
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/healthcheck-path: /

@@ -15,3 +15,18 @@ module "root_infrastructure" {
   db_deletion_protection = var.db_deletion_protection
   enable_s3_assets       = var.enable_s3_assets
 }
+
+module "helm_releases" {
+  source = "../../modules/helm_releases"
+
+  region                            = var.region
+  cluster_name                      = module.root_infrastructure.cluster_name
+  load_balancer_controller_role_arn = module.root_infrastructure.load_balancer_controller_role_arn
+  external_secrets_irsa_role_arn    = module.root_infrastructure.external_secrets_irsa_role_arn
+  cluster_autoscaler_irsa_role_arn  = module.root_infrastructure.cluster_autoscaler_irsa_role_arn
+  rds_address                       = module.root_infrastructure.rds_address
+  redis_address                     = module.root_infrastructure.redis_address
+  django_secret_name                = module.root_infrastructure.django_secret_name
+  db_password_secret_name           = module.root_infrastructure.db_password_secret_name
+  django_admin_secret_name          = module.root_infrastructure.django_admin_secret_name
+}

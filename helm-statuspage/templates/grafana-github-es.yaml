@@ -1,0 +1,22 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-github-auth
+  namespace: monitoring
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: ClusterSecretStore
+  target:
+    name: grafana-github-secret
+    creationPolicy: Owner
+  data:
+    - secretKey: GF_AUTH_GITHUB_CLIENT_ID
+      remoteRef:
+        key: {{ .Values.secrets.grafanaGithubSecretName }}
+        property: GF_AUTH_GITHUB_CLIENT_ID
+    - secretKey: GF_AUTH_GITHUB_CLIENT_SECRET
+      remoteRef:
+        key:  {{ .Values.secrets.grafanaGithubSecretName }}
+        property: GF_AUTH_GITHUB_CLIENT_SECRET

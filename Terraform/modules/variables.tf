@@ -62,3 +62,8 @@ variable "enable_s3_assets" {
   description = "Toggles the creation of S3 bucket and IRSA resources"
   type        = bool
 }
+
+variable "ami_type" {
+  description = "Defines the AMI type of the nodes"
+  default = "AL2023_x86_64_STANDARD"
+}
