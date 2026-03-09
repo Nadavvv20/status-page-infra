@@ -14,16 +14,16 @@ resource "kubernetes_storage_class_v1" "gp3" {
       "storageclass.kubernetes.io/is-default-class" = "true"
     }
   }
-  storage_provisioner    = "ebs.csi.aws.com"
-  reclaim_policy         = "Retain"
-  volume_binding_mode    = "WaitForFirstConsumer"
+  storage_provisioner = "ebs.csi.aws.com"
+  reclaim_policy      = "Retain"
+  volume_binding_mode = "WaitForFirstConsumer"
   parameters = {
     type = "gp3"
   }
   depends_on = [module.eks]
 }
 
- # This allows each t3.medium node to have 110 IP adresses for pods instead of only 17
+# This allows each t3.medium node to have 110 IP adresses for pods instead of only 17
 # --- VPC CNI Add-on ---
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name                = module.eks.cluster_name

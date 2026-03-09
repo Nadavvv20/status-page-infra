@@ -11,7 +11,7 @@ module "db" {
   major_engine_version = "15"
   instance_class       = var.db_instance_class
 
-  allocated_storage = 20
+  allocated_storage           = 20
   manage_master_user_password = false
 
   db_name  = "statuspage"
@@ -23,7 +23,7 @@ module "db" {
   db_subnet_group_name   = module.vpc.database_subnet_group_name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
 
-  deletion_protection = var.db_deletion_protection 
+  deletion_protection = var.db_deletion_protection
   skip_final_snapshot = true
 
   tags = {

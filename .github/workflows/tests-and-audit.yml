@@ -1,0 +1,72 @@
+name: CI/CD Tests & Security Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_security_audit:
+        description: 'Run Security Port Audit'
+        type: boolean
+        default: true
+      run_cicd_tests:
+        description: 'Run CI/CD Unit Tests'
+        type: boolean
+        default: true
+
+jobs:
+  cicd-unit-tests:
+    if: ${{ github.event.inputs.run_cicd_tests == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: 'v3.14.0'
+
+    - name: Run CI/CD Unit Tests
+      shell: pwsh
+      run: |
+        ./tests/ci-cd-tests.ps1
+
+  security-port-audit:
+    if: ${{ github.event.inputs.run_security_audit == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Security Port Audit
+      shell: pwsh
+      run: |
+        ./scripts/security-port-audit.ps1
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [cicd-unit-tests, security-port-audit]
+    if: always()
+    steps:
+    - name: Test Results Summary
+      run: |
+        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ needs.cicd-unit-tests.result }}" == "success" ]; then
+          echo "✅ **CI/CD Unit Tests:** PASSED" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.cicd-unit-tests.result }}" == "skipped" ]; then
+          echo "⏭️ **CI/CD Unit Tests:** SKIPPED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **CI/CD Unit Tests:** FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if [ "${{ needs.security-port-audit.result }}" == "success" ]; then
+          echo "✅ **Security Port Audit:** PASSED (no critical alerts)" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.security-port-audit.result }}" == "skipped" ]; then
+          echo "⏭️ **Security Port Audit:** SKIPPED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **Security Port Audit:** ALERTS FOUND (review logs)" >> $GITHUB_STEP_SUMMARY
+        fi
