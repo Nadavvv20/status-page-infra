@@ -33,4 +33,5 @@ module "helm_releases" {
   thanos_objstore_secret_name       = module.root_infrastructure.thanos_objstore_secret_name
   loki_irsa_role_arn                = module.root_infrastructure.loki_irsa_role_arn
   monitoring_data_bucket_id         = module.root_infrastructure.monitoring_data_bucket_id
+  efs_csi_driver_irsa_role_arn      = module.root_infrastructure.efs_csi_driver_irsa_role_arn
 }

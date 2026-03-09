@@ -197,17 +197,27 @@ resource "aws_iam_policy" "eks_describe_addon" {
 }
 
 ##################################################################
-# IAM Roles (IRSA) For Prometheus and Loki to access the S3 bucket
+# IAM Roles (IRSA) For Prometheus and Loki to access
 data "aws_iam_policy_document" "monitoring_s3_access" {
+
   statement {
     actions = [
       "s3:ListBucket",
+      "s3:GetBucketLocation"
+    ]
+    resources = [
+      aws_s3_bucket.monitoring_data.arn
+    ]
+  }
+
+
+  statement {
+    actions = [
       "s3:PutObject",
       "s3:GetObject",
       "s3:DeleteObject"
     ]
     resources = [
-      aws_s3_bucket.monitoring_data.arn,
       "${aws_s3_bucket.monitoring_data.arn}/*"
     ]
   }
@@ -217,6 +227,7 @@ resource "aws_iam_policy" "monitoring_s3_policy" {
   name   = "MonitoringS3AccessPolicy"
   policy = data.aws_iam_policy_document.monitoring_s3_access.json
 }
+
 
 resource "aws_iam_role" "thanos_irsa" {
   name = "thanos-s3-irsa"
@@ -230,16 +241,15 @@ resource "aws_iam_role" "thanos_irsa" {
       }
       Condition = {
         "StringEquals" = {
-          "${replace(module.eks.oidc_provider, "https://", "")}:sub" = "system:serviceaccount:monitoring:prometheus-prometheus-stack-kube-prom-prometheus"
+          "${replace(module.eks.oidc_provider, "https://", "")}:aud" = "sts.amazonaws.com"
+          "${replace(module.eks.oidc_provider, "https://", "")}:sub" = [
+            "system:serviceaccount:monitoring:prometheus-prometheus-stack-kube-prom-prometheus",
+            "system:serviceaccount:monitoring:thanos-storegateway"
+          ]
         }
       }
     }]
   })
-}
-
-resource "aws_iam_role_policy_attachment" "thanos_s3" {
-  role       = aws_iam_role.thanos_irsa.name
-  policy_arn = aws_iam_policy.monitoring_s3_policy.arn
 }
 
 resource "aws_iam_role" "loki_irsa" {
@@ -254,6 +264,7 @@ resource "aws_iam_role" "loki_irsa" {
       }
       Condition = {
         "StringEquals" = {
+          "${replace(module.eks.oidc_provider, "https://", "")}:aud" = "sts.amazonaws.com"
           "${replace(module.eks.oidc_provider, "https://", "")}:sub" = "system:serviceaccount:monitoring:loki"
         }
       }
@@ -261,7 +272,40 @@ resource "aws_iam_role" "loki_irsa" {
   })
 }
 
+
+resource "aws_iam_role_policy_attachment" "thanos_s3" {
+  role       = aws_iam_role.thanos_irsa.name
+  policy_arn = aws_iam_policy.monitoring_s3_policy.arn
+}
+
 resource "aws_iam_role_policy_attachment" "loki_s3" {
   role       = aws_iam_role.loki_irsa.name
   policy_arn = aws_iam_policy.monitoring_s3_policy.arn
+}
+
+##################################################################
+# IAM Role for EFS CSI Driver
+resource "aws_iam_role" "efs_csi_driver_irsa" {
+  name = "efs-csi-driver-irsa"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Effect = "Allow"
+      Principal = {
+        Federated = module.eks.oidc_provider_arn
+      }
+      Condition = {
+        "StringEquals" = {
+          "${replace(module.eks.oidc_provider, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "efs_csi_driver_attach" {
+  role       = aws_iam_role.efs_csi_driver_irsa.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
 }

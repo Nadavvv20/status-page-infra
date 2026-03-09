@@ -123,6 +123,22 @@ resource "helm_release" "prometheus_stack" {
   values = [
     yamlencode({
       grafana = {
+        sidecar = {
+          datasources = {
+            defaultDatasourceEnabled = false
+          }
+        }
+        initChownData = {
+          enabled = false
+        }
+        podSecurityContext = {
+          fsGroup = 472
+        }
+        containerSecurityContext = {
+          runAsUser = 472
+          runAsGroup = 472
+        }
+
         deploymentStrategy = {
           type = "Recreate"
         }
@@ -216,13 +232,24 @@ resource "helm_release" "thanos" {
 
   values = [
     yamlencode({
-      objstoreConfig = var.thanos_objstore_secret_name
+      global = {
+        security = {
+          allowInsecureImages = true
+        }
+      }
+      image = {
+        registry   = "quay.io"
+        repository = "thanos/thanos"
+        tag        = "v0.37.2"
+      }
+      
+      existingObjstoreSecret = "thanos-objstore-config"
       query = {
         enabled = true
         stores  = ["prometheus-stack-kube-prom-prometheus-thanos:10901"]
       }
       storegateway = {
-        enabled = true
+        enabled   = true
         serviceAccount = {
           create = true
           annotations = {

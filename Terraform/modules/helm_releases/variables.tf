@@ -67,3 +67,8 @@ variable "monitoring_data_bucket_id" {
   description = "The ID of the S3 bucket used for monitoring data"
   type        = string
 }
+
+variable "efs_csi_driver_irsa_role_arn" {
+  description = "Role ARN for EFS CSI Driver IRSA"
+  type        = string
+}

@@ -62,13 +62,22 @@ resource "kubernetes_secret_v1" "thanos_objstore" {
     namespace = "monitoring"
   }
   data = {
-    "thanos.yaml" = yamlencode({
+    "objstore.yml" = yamlencode({
       type = "s3"
       config = {
         bucket   = aws_s3_bucket.monitoring_data.id
         endpoint = "s3.${var.region}.amazonaws.com"
-        prefix   = "thanos/"
       }
     })
   }
+}
+
+# EFS CSI Add-on
+resource "aws_eks_addon" "efs_csi" {
+  cluster_name             = var.cluster_name
+  addon_name               = "aws-efs-csi-driver"
+  service_account_role_arn = aws_iam_role.efs_csi_driver_irsa.arn
+  
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
 }

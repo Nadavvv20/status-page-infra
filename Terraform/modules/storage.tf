@@ -16,7 +16,7 @@ resource "aws_efs_file_system" "grafana_storage" {
 # Allow     
 resource "aws_security_group" "efs_sg" {
   name        = "grafana-efs-sg"
-  vpc_id      = module.vpc.default_vpc_id 
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port       = 2049

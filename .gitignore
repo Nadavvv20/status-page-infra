@@ -36,3 +36,9 @@ credentials
 Thumbs.db
 .vscode/
 .history/
+
+Final workshop.pdf
+package-lock.json
+package.json
+read_pdf.js
+node_modules/
