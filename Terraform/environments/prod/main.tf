@@ -29,4 +29,8 @@ module "helm_releases" {
   django_secret_name                = module.root_infrastructure.django_secret_name
   db_password_secret_name           = module.root_infrastructure.db_password_secret_name
   django_admin_secret_name          = module.root_infrastructure.django_admin_secret_name
+  thanos_irsa_role_arn              = module.root_infrastructure.thanos_irsa_role_arn
+  thanos_objstore_secret_name       = module.root_infrastructure.thanos_objstore_secret_name
+  loki_irsa_role_arn                = module.root_infrastructure.loki_irsa_role_arn
+  monitoring_data_bucket_id         = module.root_infrastructure.monitoring_data_bucket_id
 }
