@@ -68,7 +68,4 @@ variable "monitoring_data_bucket_id" {
   type        = string
 }
 
-variable "efs_csi_driver_irsa_role_arn" {
-  description = "Role ARN for EFS CSI Driver IRSA"
-  type        = string
-}
+
