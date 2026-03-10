@@ -1,7 +1,7 @@
 # ==================================================================
 # S3 access policy:
 resource "aws_iam_policy" "s3_access_policy" {
-  count  = var.enable_s3_assets ? 1 : 0
+  count       = var.enable_s3_assets ? 1 : 0
   name        = "${var.project_name}-s3-access"
   description = "Allow Django pods to access S3 assets"
 
@@ -9,8 +9,8 @@ resource "aws_iam_policy" "s3_access_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject"]
-        Effect   = "Allow"
+        Action = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:DeleteObject"]
+        Effect = "Allow"
         Resource = [
           aws_s3_bucket.app_assets[0].arn,
           "${aws_s3_bucket.app_assets[0].arn}/*"
@@ -20,7 +20,7 @@ resource "aws_iam_policy" "s3_access_policy" {
   })
 }
 module "statuspage_app_irsa" {
-  count  = var.enable_s3_assets ? 1 : 0
+  count   = var.enable_s3_assets ? 1 : 0
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.0"
 
@@ -34,7 +34,7 @@ module "statuspage_app_irsa" {
 }
 
 resource "aws_iam_role_policy_attachment" "app_s3_attach" {
-  count  = var.enable_s3_assets ? 1 : 0
+  count      = var.enable_s3_assets ? 1 : 0
   role       = module.statuspage_app_irsa[0].iam_role_name
   policy_arn = aws_iam_policy.s3_access_policy[0].arn
 }
@@ -84,12 +84,12 @@ resource "aws_iam_policy" "secrets_read_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [  
+        Resource = [
           aws_secretsmanager_secret.db_password.arn,
           aws_secretsmanager_secret.django_secret.arn,
           aws_secretsmanager_secret.django_admin_secret.arn,
@@ -153,7 +153,7 @@ resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
   role       = aws_iam_role.ebs_csi_irsa.name
 }
 
- # --- IAM Role for VPC CNI (aws-node) ---
+# --- IAM Role for VPC CNI (aws-node) ---
 data "aws_iam_policy_document" "vpc_cni_assume_role" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]

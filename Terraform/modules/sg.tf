@@ -46,9 +46,9 @@ resource "aws_security_group" "rds_sg" {
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
+    from_port = 5432
+    to_port   = 5432
+    protocol  = "tcp"
     # Allow access only to those from the Security Group that EKS automatically generates for Nodes
     security_groups = [module.eks.node_security_group_id]
   }
@@ -63,7 +63,7 @@ resource "aws_security_group" "rds_sg" {
   tags = {
     Name        = "${var.project_name}-rds-sg"
     Environment = var.environment
-    Project = var.project_name
+    Project     = var.project_name
   }
 }
 
@@ -90,7 +90,7 @@ resource "aws_security_group" "redis_sg" {
   tags = {
     Name        = "${var.project_name}-redis-sg"
     Environment = var.environment
-    Project = var.project_name
+    Project     = var.project_name
   }
 }
 

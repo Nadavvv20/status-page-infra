@@ -28,21 +28,21 @@ module "eks" {
       capacity_type  = var.capacity_type
       ami_type       = var.ami_type
       iam_role_additional_policies = {
-      describe_addon = aws_iam_policy.eks_describe_addon.arn
+        describe_addon = aws_iam_policy.eks_describe_addon.arn
       }
       enable_bootstrap_user_data = true
-      enable_prefix_delegation = true
-      
+      enable_prefix_delegation   = true
+
 
       # Connect only to the private app subnets
       subnet_ids = module.vpc.private_subnets
 
       tags = {
-        NodeGroup = "app-nodes"
+        NodeGroup                                       = "app-nodes"
         "k8s.io/cluster-autoscaler/enabled"             = "true"
         "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
         "kubernetes.io/cluster/${var.cluster_name}"     = "owned"
-        Name = "${var.project_name}-Worker-Node"
+        Name                                            = "${var.project_name}-Worker-Node"
       }
     }
   }
