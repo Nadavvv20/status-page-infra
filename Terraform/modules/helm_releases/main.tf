@@ -280,7 +280,8 @@ resource "helm_release" "prometheus_stack" {
           # CRITICAL: The image field MUST be set explicitly. Without it,
           # the Prometheus Operator will NOT inject the sidecar container.
           thanos = {
-            image = "quay.io/thanos/thanos:v0.37.2"
+            image     = "quay.io/thanos/thanos:v0.37.2"
+            blockSize = "30m" # CRITICAL: This is what actually sets --storage.tsdb.min/max-block-duration
             objectStorageConfig = {
               existingSecret = {
                 name = "thanos-objstore-config"
@@ -294,10 +295,11 @@ resource "helm_release" "prometheus_stack" {
             }
           }
 
-          # -- TSDB block boundaries: 2h is required for Thanos to upload --
-          # Thanos only uploads completed 2h blocks. Values must match.
-          storageTsdbMinBlockDuration = "2h"
-          storageTsdbMaxBlockDuration = "2h"
+          # -- TSDB block boundaries: 30m to survive hourly node termination --
+          # 30m ensures at least 1 block is cut & uploaded before the node dies.
+          # Safe since Thanos Compactor is disabled in this setup.
+          storageTsdbMinBlockDuration = "30m"
+          storageTsdbMaxBlockDuration = "30m"
 
           # -- Stateless: emptyDir replaces any PVC for local TSDB --
           # Data survives within the pod lifecycle; after restart,
@@ -309,7 +311,7 @@ resource "helm_release" "prometheus_stack" {
           }
 
           # -- Retention: only keep recent data locally --
-          retention = "6h"
+          retention = "2h"
         }
       }
 
