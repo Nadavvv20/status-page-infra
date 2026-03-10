@@ -1,6 +1,6 @@
 # providers.tf
 terraform {
-    # Specifies the required Terraform CLI version
+  # Specifies the required Terraform CLI version
   required_version = ">= 1.2"
 
   required_providers {
@@ -8,7 +8,7 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
-        }
+    }
     helm = {
       source  = "hashicorp/helm"
       version = ">= 2.0"
@@ -17,13 +17,13 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = ">= 2.0"
     }
-    }
-    # Save the state in S3 for data durability
-    backend "s3" {
-    bucket         = "nadav-tfstate-bucket" 
-    key            = "prod/terraform.tfstate" 
-    region         = "us-east-1"                          
-    encrypt        = true                                 
+  }
+  # Save the state in S3 for data durability
+  backend "s3" {
+    bucket  = "nadav-tfstate-bucket"
+    key     = "prod/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
   }
 }
 # Configure the default AWS provider

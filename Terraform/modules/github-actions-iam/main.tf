@@ -217,7 +217,7 @@ output "github_oidc_provider_arn" {
 
 output "setup_instructions" {
   description = "Instructions for completing the setup"
-  value = <<-EOT
+  value       = <<-EOT
     
     ✅ Terraform resources created successfully!
     
