@@ -22,7 +22,7 @@ module "eks" {
       name         = "app-nodes"
       min_size     = 1
       max_size     = 2
-      desired_size = 1
+      desired_size = 2
 
       instance_types = var.instance_types
       capacity_type  = var.capacity_type
