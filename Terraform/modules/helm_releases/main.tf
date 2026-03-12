@@ -222,8 +222,8 @@ resource "helm_release" "prometheus_stack" {
             allow_sign_up = false
           }
           server = {
-            domain              = ""
-            root_url            = "http://k8s-statuspagegroup-1e30f316ef-1437681547.us-east-1.elb.amazonaws.com/grafana/"
+            domain              = "cheri-lady.com"
+            root_url            = "https://cheri-lady.com/grafana/"
             serve_from_sub_path = true
           }
         }
@@ -233,13 +233,15 @@ resource "helm_release" "prometheus_stack" {
           enabled          = true
           ingressClassName = "alb"
           annotations = {
-            "alb.ingress.kubernetes.io/group.name"       = "statuspage-group"
-            "alb.ingress.kubernetes.io/order"            = "10"
-            "alb.ingress.kubernetes.io/scheme"           = "internet-facing"
-            "alb.ingress.kubernetes.io/target-type"      = "ip"
-            "alb.ingress.kubernetes.io/healthcheck-path" = "/api/health"
+            "alb.ingress.kubernetes.io/group.name" = "statuspage-group"
+            "alb.ingress.kubernetes.io/order"      = "110" 
+            "alb.ingress.kubernetes.io/scheme"     = "internet-facing"
+            "alb.ingress.kubernetes.io/target-type" = "ip"
+            "alb.ingress.kubernetes.io/listen-ports" = "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
+            "alb.ingress.kubernetes.io/certificate-arn" = "arn:aws:acm:us-east-1:992382545251:certificate/d749cd73-0a1d-4087-a25e-902f1f8bb8e9"
+            "alb.ingress.kubernetes.io/actions.ssl-redirect" = "{\"Type\": \"redirect\", \"RedirectConfig\": { \"Protocol\": \"HTTPS\", \"Port\": \"443\", \"StatusCode\": \"HTTP_301\"}}"
           }
-          hosts    = [""]
+          hosts = ["cheri-lady.com"]
           path     = "/grafana"
           pathType = "Prefix"
         }
