@@ -219,8 +219,7 @@ resource "helm_release" "prometheus_stack" {
         "grafana.ini" = {
           "auth.github" = {
             enabled       = true
-            allow_sign_up = true
-            allowed_users = "Nadavvv20"
+            allow_sign_up = false
           }
           server = {
             domain              = ""
