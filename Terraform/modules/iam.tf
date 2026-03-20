@@ -93,7 +93,8 @@ resource "aws_iam_policy" "secrets_read_policy" {
           aws_secretsmanager_secret.db_password.arn,
           aws_secretsmanager_secret.django_secret.arn,
           aws_secretsmanager_secret.django_admin_secret.arn,
-          data.aws_secretsmanager_secret.grafana_github_auth.arn
+          data.aws_secretsmanager_secret.grafana_github_auth.arn,
+          data.aws_secretsmanager_secret.statuspage_github_auth.arn
         ]
       }
     ]
@@ -125,6 +126,9 @@ resource "aws_iam_role_policy_attachment" "secrets_attach" {
 # Github auth secret
 data "aws_secretsmanager_secret" "grafana_github_auth" {
   name = "nadav-grafana/github-auth"
+}
+data "aws_secretsmanager_secret" "statuspage_github_auth" {
+  name  = "nadav-statuspage/github-auth"
 }
 ####################################
 # --- IAM Role for EBS CSI Driver ---
