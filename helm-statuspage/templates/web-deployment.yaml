@@ -64,6 +64,21 @@ spec:
                 secretKeyRef:
                   name: statuspage-secrets
                   key: SECRET_KEY
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: statuspage-github-secret
+                  key: GITHUB_CLIENT_ID
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: statuspage-github-secret
+                  key: GITHUB_CLIENT_SECRET
+            - name: ALLOWED_GITHUB_USERS
+              valueFrom:
+                secretKeyRef:
+                  name: statuspage-github-secret
+                  key: ALLOWED_GITHUB_USERS
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
