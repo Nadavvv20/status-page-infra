@@ -1,0 +1,73 @@
+# =============================================================
+# Production Environment Values Override
+# =============================================================
+# This file overrides values.yaml for the production namespace.
+# Deploy with:
+#   helm upgrade --install statuspage ./helm-statuspage \
+#     --namespace statuspage \
+#     --values helm-statuspage/values.yaml \
+#     --values helm-statuspage/values-production.yaml \
+#     --set image.tag=<IMAGE_TAG>
+# =============================================================
+
+replicaCount: 3
+worker:
+  replicaCount: 2
+
+# --- Resource limits (production-grade) ---
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+# --- App settings ---
+config:
+  djangoDebug: "False"
+  allowedHosts: "cheri-lady.com"
+  useS3: "False"
+  awsRegion: "us-east-1"
+  environment: "production"
+  adminUsername: "admin"
+  adminEmail: "admin@example.com"
+
+# --- Autoscaling enabled in production ---
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 85
+
+# --- Service account ---
+serviceAccount:
+  create: true
+
+# --- Secrets ---
+secrets:
+  grafanaGithubSecretName: "nadav-grafana/github-auth"
+
+# --- Ingress (production) ---
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/group.name: "statuspage-group"
+    alb.ingress.kubernetes.io/order: '100'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-port: "8000"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:992382545251:certificate/d749cd73-0a1d-4087-a25e-902f1f8bb8e9
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+  hosts:
+    - host: cheri-lady.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+httpRoute:
+  enabled: false

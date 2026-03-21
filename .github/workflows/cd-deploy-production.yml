@@ -1,0 +1,379 @@
+# =============================================================
+# CD - Deploy to Production
+# =============================================================
+# Manual-only workflow that requires explicit YES approval.
+# Triggered AFTER staging has been verified.
+#
+# Flow: Staging verified → Manual workflow_dispatch → 
+#       Verify approval → Deploy to production → Health checks
+# =============================================================
+
+name: CD - Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval:
+        description: 'Confirm deployment to production: type YES'
+        required: true
+      source:
+        description: 'Deploy from:'
+        required: true
+        type: choice
+        options:
+          - 'staging-verified'
+          - 'custom-image-tag'
+      image_tag:
+        description: 'Image tag (required if custom-image-tag selected, otherwise uses staging tag)'
+        required: false
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: Nadav-Statuspage-EKS-DEV
+  ECR_REPOSITORY: 992382545251.dkr.ecr.us-east-1.amazonaws.com/nadav-statuspage
+  HELM_RELEASE_NAME: statuspage
+  HELM_NAMESPACE: statuspage
+  STAGING_RELEASE: statuspage-staging
+  STAGING_NAMESPACE: staging
+
+# ─────────────────────────────────────────────────────────────
+# JOBS
+# ─────────────────────────────────────────────────────────────
+jobs:
+
+  # ===========================================================
+  # Job 1: Verify Approval
+  # ===========================================================
+  verify-approval:
+    name: "Verify Approval"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      IMAGE_TAG: ${{ steps.resolve-tag.outputs.IMAGE_TAG }}
+    steps:
+      - name: Check approval
+        run: |
+          echo "🔐 Verifying deployment approval..."
+          echo "   Approval input: '${{ github.event.inputs.approval }}'"
+          echo "   Actor:          ${{ github.actor }}"
+          echo "   Timestamp:      $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+
+          if [ "${{ github.event.inputs.approval }}" != "YES" ]; then
+            echo ""
+            echo "❌ REJECTED: Approval must be exactly 'YES'"
+            echo "   You entered: '${{ github.event.inputs.approval }}'"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ Approval verified: YES"
+          echo "   Approved by: ${{ github.actor }}"
+          echo "   Timestamp:   $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+
+      - name: Checkout infra repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl & Helm
+        run: |
+          curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Resolve image tag
+        id: resolve-tag
+        run: |
+          SOURCE="${{ github.event.inputs.source }}"
+          CUSTOM_TAG="${{ github.event.inputs.image_tag }}"
+
+          if [ "$SOURCE" == "staging-verified" ]; then
+            echo "📦 Resolving image tag from current staging deployment..."
+            IMAGE_TAG=$(helm get values ${{ env.STAGING_RELEASE }} -n ${{ env.STAGING_NAMESPACE }} -o json 2>/dev/null | jq -r '.image.tag // empty')
+
+            if [ -z "$IMAGE_TAG" ]; then
+              # Fallback: read from values.yaml
+              IMAGE_TAG=$(grep '^  tag:' helm-statuspage/values.yaml | awk '{print $2}' | tr -d '"')
+              echo "   ⚠️ Could not get staging tag, using values.yaml: $IMAGE_TAG"
+            else
+              echo "   ✅ Staging image tag: $IMAGE_TAG"
+            fi
+          elif [ "$SOURCE" == "custom-image-tag" ]; then
+            if [ -z "$CUSTOM_TAG" ]; then
+              echo "❌ Custom image tag source selected but no tag provided!"
+              exit 1
+            fi
+            IMAGE_TAG="$CUSTOM_TAG"
+            echo "📦 Using custom image tag: $IMAGE_TAG"
+          fi
+
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Verify image exists in ECR
+        run: |
+          IMAGE_TAG="${{ steps.resolve-tag.outputs.IMAGE_TAG }}"
+          echo "🔍 Verifying image exists in ECR..."
+          echo "   Repository: ${{ env.ECR_REPOSITORY }}"
+          echo "   Tag:        $IMAGE_TAG"
+
+          # Check if image exists in ECR
+          aws ecr describe-images \
+            --repository-name nadav-statuspage \
+            --image-ids imageTag=$IMAGE_TAG \
+            --region ${{ env.AWS_REGION }} > /dev/null 2>&1 && IMAGE_EXISTS=true || IMAGE_EXISTS=false
+
+          if [ "$IMAGE_EXISTS" = true ]; then
+            echo "✅ Image verified in ECR: $IMAGE_TAG"
+          else
+            echo "❌ Image NOT found in ECR: $IMAGE_TAG"
+            echo "   Ensure the image was built and pushed before deploying"
+            exit 1
+          fi
+
+  # ===========================================================
+  # Job 2: Deploy to Production
+  # ===========================================================
+  deploy-production:
+    name: "Deploy to Production"
+    runs-on: ubuntu-latest
+    needs: verify-approval
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout infra repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          echo "✅ Connected to EKS cluster: ${{ env.EKS_CLUSTER_NAME }}"
+
+      - name: Ensure production namespace exists
+        run: |
+          if kubectl get namespace ${{ env.HELM_NAMESPACE }} >/dev/null 2>&1; then
+            echo "✅ Namespace '${{ env.HELM_NAMESPACE }}' already exists"
+          else
+            kubectl create namespace ${{ env.HELM_NAMESPACE }}
+            echo "✅ Created namespace '${{ env.HELM_NAMESPACE }}'"
+          fi
+
+      - name: Update values.yaml with new image tag
+        run: |
+          IMAGE_TAG="${{ needs.verify-approval.outputs.IMAGE_TAG }}"
+          sed -i "s/tag: \".*\"/tag: \"$IMAGE_TAG\"/" helm-statuspage/values.yaml
+          echo "✅ Updated image tag in values.yaml to $IMAGE_TAG"
+
+      - name: Commit and push tag update
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          git add helm-statuspage/values.yaml
+          git commit -m "Production deploy: update image tag to ${{ needs.verify-approval.outputs.IMAGE_TAG }}" || echo "No changes to commit"
+          git push || echo "No changes to push"
+
+      - name: Deploy to production
+        run: |
+          IMAGE_TAG="${{ needs.verify-approval.outputs.IMAGE_TAG }}"
+          echo "🚀 Deploying to PRODUCTION..."
+          echo "═══════════════════════════════════════"
+          echo "  Release:    ${{ env.HELM_RELEASE_NAME }}"
+          echo "  Namespace:  ${{ env.HELM_NAMESPACE }}"
+          echo "  Image Tag:  $IMAGE_TAG"
+          echo "  Source:     ${{ github.event.inputs.source }}"
+          echo "  Approved:   ${{ github.actor }}"
+          echo "  Timestamp:  $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "═══════════════════════════════════════"
+
+          helm upgrade --install ${{ env.HELM_RELEASE_NAME }} ./helm-statuspage \
+            --namespace ${{ env.HELM_NAMESPACE }} \
+            --values helm-statuspage/values.yaml \
+            --values helm-statuspage/values-production.yaml \
+            --set image.tag=$IMAGE_TAG \
+            --wait \
+            --timeout 10m \
+            --atomic
+
+          echo "✅ Production Helm deployment successful"
+
+      - name: Wait for rollout
+        run: |
+          echo "⏳ Waiting for production rollout..."
+
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-web \
+            -n ${{ env.HELM_NAMESPACE }} --timeout=10m
+          echo "  ✅ Web deployment ready"
+
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-worker \
+            -n ${{ env.HELM_NAMESPACE }} --timeout=10m
+          echo "  ✅ Worker deployment ready"
+
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-scheduler \
+            -n ${{ env.HELM_NAMESPACE }} --timeout=10m
+          echo "  ✅ Scheduler deployment ready"
+
+      - name: Verify all replicas ready
+        run: |
+          echo "🔍 Verifying production replicas..."
+
+          DESIRED=$(kubectl get deployment ${{ env.HELM_RELEASE_NAME }}-web -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.spec.replicas}')
+          READY=$(kubectl get deployment ${{ env.HELM_RELEASE_NAME }}-web -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+
+          echo "  Web: $READY/$DESIRED replicas ready"
+
+          if [ "$READY" -ge "$DESIRED" ]; then
+            echo "  ✅ All web replicas are ready"
+          else
+            echo "  ❌ Not all web replicas are ready!"
+            kubectl get pods -n ${{ env.HELM_NAMESPACE }} -l app=${{ env.HELM_RELEASE_NAME }}-web
+            exit 1
+          fi
+
+      - name: Production health check
+        run: |
+          echo "🔍 Running production health checks..."
+
+          POD_NAME=$(kubectl get pods -n ${{ env.HELM_NAMESPACE }} -l app=${{ env.HELM_RELEASE_NAME }}-web -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+
+          if [ -z "$POD_NAME" ]; then
+            echo "❌ No production web pod found!"
+            exit 1
+          fi
+
+          # Port-forward and test
+          kubectl port-forward -n ${{ env.HELM_NAMESPACE }} "$POD_NAME" 8000:8000 &
+          PF_PID=$!
+          sleep 5
+
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ --max-time 10 2>/dev/null || echo "000")
+          kill $PF_PID 2>/dev/null || true
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            echo "  ✅ Health check passed: HTTP $HTTP_CODE"
+          else
+            echo "  ❌ Health check failed: HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Get production Ingress URL
+        id: prod-url
+        run: |
+          echo "🌐 Getting production Ingress URL..."
+          sleep 10
+          kubectl get ingress -n ${{ env.HELM_NAMESPACE }}
+
+          ALB_URL=$(kubectl get ingress -n ${{ env.HELM_NAMESPACE }} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          if [ -n "$ALB_URL" ]; then
+            echo "PROD_URL=https://$ALB_URL" >> $GITHUB_OUTPUT
+            echo "🌐 Production URL: https://$ALB_URL"
+          else
+            echo "PROD_URL=N/A" >> $GITHUB_OUTPUT
+          fi
+
+  # ===========================================================
+  # Job 3: Production Report
+  # ===========================================================
+  production-report:
+    name: "Production Report"
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [verify-approval, deploy-production]
+    permissions:
+      contents: read
+    steps:
+      - name: Generate production deployment report
+        run: |
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════╗"
+          echo "║        PRODUCTION DEPLOYMENT REPORT                     ║"
+          echo "╚══════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "─── Deployment Metadata ───"
+          echo "  🏷️  Image Tag:    ${{ needs.verify-approval.outputs.IMAGE_TAG }}"
+          echo "  📂 Source:        ${{ github.event.inputs.source }}"
+          echo "  👤 Approved by:   ${{ github.actor }}"
+          echo "  🕐 Timestamp:     $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo "  🌍 Environment:   PRODUCTION"
+          echo ""
+
+          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
+            echo "  🎉 PRODUCTION DEPLOYMENT SUCCESSFUL"
+          else
+            echo "  ❌ PRODUCTION DEPLOYMENT FAILED"
+            echo "     Check the deploy-production job logs for details"
+          fi
+
+      - name: Post GitHub Step Summary
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'SUMMARY_EOF'
+          ## 🏭 Production Deployment Report
+
+          | Field | Value |
+          |-------|-------|
+          | **Image Tag** | `${{ needs.verify-approval.outputs.IMAGE_TAG }}` |
+          | **Source** | ${{ github.event.inputs.source }} |
+          | **Approved By** | ${{ github.actor }} |
+          | **Timestamp** | $(date -u +'%Y-%m-%d %H:%M:%S UTC') |
+          | **Approval** | ${{ needs.verify-approval.result == 'success' && '✅ YES' || '❌ REJECTED' }} |
+          | **Deployment** | ${{ needs.deploy-production.result == 'success' && '✅ SUCCESS' || '❌ FAILED' }} |
+          SUMMARY_EOF
+
+      - name: Notify status-page-app of production deployment
+        continue-on-error: true
+        run: |
+          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
+            STATUS="success"
+          else
+            STATUS="failure"
+          fi
+
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            https://api.github.com/repos/Nadavvv20/status-page-app/dispatches \
+            -d "{
+              \"event_type\": \"production-deployment-complete\",
+              \"client_payload\": {
+                \"image_tag\": \"${{ needs.verify-approval.outputs.IMAGE_TAG }}\",
+                \"status\": \"$STATUS\",
+                \"environment\": \"production\",
+                \"approved_by\": \"${{ github.actor }}\",
+                \"source\": \"${{ github.event.inputs.source }}\",
+                \"timestamp\": \"$(date -u +'%Y-%m-%d %H:%M:%S UTC')\",
+                \"run_url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              }
+            }"
+
+          echo "✅ Notification sent to status-page-app"

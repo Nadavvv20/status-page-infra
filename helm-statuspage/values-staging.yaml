@@ -1,0 +1,70 @@
+# =============================================================
+# Staging Environment Values Override
+# =============================================================
+# This file overrides values.yaml for the staging namespace.
+# Deploy with:
+#   helm upgrade --install statuspage-staging ./helm-statuspage \
+#     --namespace staging \
+#     --values helm-statuspage/values.yaml \
+#     --values helm-statuspage/values-staging.yaml \
+#     --set image.tag=<IMAGE_TAG>
+# =============================================================
+
+replicaCount: 1
+worker:
+  replicaCount: 1
+
+# --- Resource limits (lower than production) ---
+resources:
+  limits:
+    cpu: 250m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# --- App settings ---
+config:
+  djangoDebug: "False"
+  allowedHosts: "*"
+  useS3: "False"
+  awsRegion: "us-east-1"
+  environment: "staging"
+  adminUsername: "admin"
+  adminEmail: "admin@example.com"
+
+# --- Autoscaling disabled in staging ---
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 85
+
+# --- Service account ---
+serviceAccount:
+  create: true
+
+# --- Secrets ---
+secrets:
+  grafanaGithubSecretName: "nadav-grafana/github-auth"
+
+# --- Ingress (staging-specific) ---
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/group.name: "statuspage-staging-group"
+    alb.ingress.kubernetes.io/order: '100'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-port: "8000"
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+
+httpRoute:
+  enabled: false
